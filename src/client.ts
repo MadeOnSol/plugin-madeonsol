@@ -469,4 +469,64 @@ export class MadeOnSolClient {
     const query = qs.toString() ? `?${qs.toString()}` : "";
     return this.restRequest("GET", `/copy-trade/signals${query}`);
   }
+
+  // ── Price alerts (PRO/ULTRA, v1.9) ──
+
+  priceAlertsList() {
+    return this.restRequest("GET", "/price-alerts");
+  }
+
+  priceAlertsCreate(params: {
+    token_mint: string;
+    drop_pct: number;
+    recovery_pct?: number;
+    name?: string;
+    delivery_mode?: "webhook" | "websocket" | "both";
+    webhook_url?: string;
+  }) {
+    return this.restRequest("POST", "/price-alerts", params);
+  }
+
+  priceAlertsGet(id: number | string) {
+    return this.restRequest("GET", `/price-alerts/${id}`);
+  }
+
+  priceAlertsUpdate(id: number | string, updates: Record<string, unknown>) {
+    return this.restRequest("PATCH", `/price-alerts/${id}`, updates);
+  }
+
+  priceAlertsDelete(id: number | string) {
+    return this.restRequest("DELETE", `/price-alerts/${id}`);
+  }
+
+  priceAlertsEvents(params?: { alert_id?: number; event_type?: string; since?: string; limit?: number }) {
+    const qs = new URLSearchParams();
+    if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest("GET", `/price-alerts/events${query}`);
+  }
+
+  // ── v1.9 new endpoints ──
+
+  scoutLeaderboard(params?: { limit?: number; scout_tier?: string; sort?: string }) {
+    const qs = new URLSearchParams();
+    if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest("GET", `/kol/scouts/leaderboard${query}`);
+  }
+
+  coordinationHistory(params?: { limit?: number; since?: string; min_score?: number }) {
+    const qs = new URLSearchParams();
+    if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest("GET", `/kol/coordination/history${query}`);
+  }
+
+  kolConsensus(mint: string) {
+    return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/kol-consensus`);
+  }
+
+  peakHistory(mint: string) {
+    return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/peak-history`);
+  }
 }
