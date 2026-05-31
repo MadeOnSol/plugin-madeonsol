@@ -9,8 +9,12 @@
 
 ElizaOS plugin for [MadeOnSol](https://madeonsol.com) — Solana KOL trading intelligence, deployer analytics, and wallet tracking.
 
-> Real-time Solana trading intelligence: track 1,000+ KOL wallets with <3s latency, score 23,000+ Pump.fun deployers by reputation, detect multi-KOL coordination signals, monitor any Solana wallet for swaps and transfers, and stream every DEX trade. Free tier: 200 requests/day at [madeonsol.com/pricing](https://madeonsol.com/pricing) — no credit card required.
+> Real-time Solana trading intelligence: track 1,069 KOL wallets with <3s latency, score 23,000+ Pump.fun deployers, surface deshred deploy signals ~500ms before on-chain confirmation, detect multi-KOL coordination, and stream every DEX trade. Free tier: 200 requests/day at [madeonsol.com/pricing](https://madeonsol.com/pricing) — no credit card required.
 
+> **New in 1.9** — **Price alerts, scout leaderboard, coordination history, wallet derived stats.** `PRICE_ALERTS_*` actions (PRO=5, ULTRA=25 rules). `SCOUT_LEADERBOARD`, `KOL_CONSENSUS`, `PEAK_HISTORY`, `COORDINATION_HISTORY`. `WALLET_STATS` now returns `derived`: win_rate, roi, verdict, biggest_miss.
+>
+> **New in 1.8** — **Universal Wallet API.** `WALLET_STATS`, `WALLET_PNL`, `WALLET_POSITIONS`, `WALLET_TRADES` — FIFO cost-basis PnL and raw trades for any Solana wallet. PRO+. Cache hits free.
+>
 > **New in 1.7.0** *(2026-05-12)* — **Account introspection + token scanner actions.** Two new actions: `meAction` (`GET_MADEONSOL_ACCOUNT`) reports the caller's tier, daily/burst quota, and webhook / copy-trade / coord-rule slot counts; `tokensListAction` (`LIST_MADEONSOL_TOKENS`) scans the Solana token universe by MC, liquidity, 1h momentum, and primary DEX. New client methods: `client.getMe()` and `client.getTokensList(params)`. Token responses now expose **velocity / MEV-share enrichment** fields. The `/tokens` scanner applies a default `min_liq=2000` so the agent isn't drowned in dust pools by default. `/token/{mint}` HTTP 400s now return structured `code` / `reason` / `example` / `docs` so the agent can self-correct bad mints. Deprecated `avg_entry_mc_usd` has been removed from all leaderboard payloads.
 
 ## Quick start (10 seconds)
