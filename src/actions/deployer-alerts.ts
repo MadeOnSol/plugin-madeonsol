@@ -48,9 +48,9 @@ export const deployerAlertsAction: Action = {
       return undefined;
     }
 
-    const data = result.data as { alerts: Array<{ title: string; token_symbol: string; priority: string; market_cap_at_alert: number | null; deployers: { tier: string; bonding_rate: number | null }; kol_buys: { count: number; kols: string[] } | null }> };
+    const data = result.data as { alerts: Array<{ title: string; token_symbol: string; priority: string; market_cap_at_alert: number | null; deployers: { tier: string; bonding_rate: number | null; runner_rate?: number | null; labeled_tokens?: number | null; avg_time_to_bond_minutes?: number | null }; kol_buys: { count: number; kols: string[] } | null }> };
     const lines = (data.alerts || []).slice(0, 10).map((a) => {
-      const deployer = a.deployers as unknown as { tier: string; bonding_rate: number | null };
+      const deployer = a.deployers as unknown as { tier: string; bonding_rate: number | null; runner_rate?: number | null; labeled_tokens?: number | null };
       const mc = a.market_cap_at_alert ? `$${(a.market_cap_at_alert / 1000).toFixed(1)}k` : "?";
       const kols = a.kol_buys ? `${a.kol_buys.count} KOLs buying` : "";
       return `[${deployer?.tier}] ${a.token_symbol || "?"} — MC: ${mc}${kols ? ` | ${kols}` : ""}`;

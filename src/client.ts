@@ -41,7 +41,7 @@ export class MadeOnSolClient {
 
     if (options.apiKey) {
       this.authMode = "madeonsol";
-      this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.10.0" };
+      this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.11.0" };
     } else if (options.fetchFn) {
       this.authMode = "x402";
     } else {
@@ -293,6 +293,11 @@ export class MadeOnSolClient {
 
   getTokenBuyerQuality(mint: string) {
     return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/buyer-quality`);
+  }
+
+  /** Transparent 0–100 rug-risk/safety score (higher = riskier) with band, explainable factors, and raw inputs. PRO+. */
+  getTokenRisk(mint: string) {
+    return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/risk`);
   }
 
   /** Bulk buyer-quality scoring for up to 50 mints. Shares the single-mint 5-min LRU cache. */
