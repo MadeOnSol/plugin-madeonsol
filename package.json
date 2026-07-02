@@ -4,7 +4,7 @@
   "description": "ElizaOS plugin for MadeOnSol — Solana KOL intelligence and deployer analytics via x402 micropayments",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LamboPoewert/plugin-madeonsol"
+    "url": "https://github.com/madeonsol/plugin-madeonsol"
   },
   "homepage": "https://madeonsol.com/solana-api",
   "type": "module",
