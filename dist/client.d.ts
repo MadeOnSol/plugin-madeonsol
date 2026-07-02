@@ -18,6 +18,61 @@ export interface RateLimitInfo {
     reset?: string;
     requestId?: string;
 }
+/** Net buy/sell flow for a token over a rolling window. Returned by `getTokenFlow`. */
+export interface TokenFlow {
+    mint: string;
+    window: "1h" | "24h";
+    from: number;
+    unique_wallets: number;
+    unique_buyers: number;
+    unique_sellers: number;
+    buy_count: number;
+    sell_count: number;
+    total_trades: number;
+    buy_sol: number;
+    sell_sol: number;
+    net_sol: number;
+    trades_per_wallet: number;
+}
+/** Transparent 0–100 rug-risk/safety score (higher = riskier). Returned by `getTokenRisk`. */
+export interface TokenRisk {
+    mint: string;
+    risk_score: number;
+    band: string;
+    factors?: Array<{
+        label: string;
+        status: string;
+        detail: string;
+    }>;
+    inputs?: Record<string, unknown>;
+}
+/** A per-mint entry in the batch-risk response: a risk result (with `as_of`), or an error object. */
+export type BatchRiskEntry = (TokenRisk & {
+    as_of: string;
+}) | {
+    mint: string;
+    error: "not_tracked" | "error";
+};
+/** Response of `getTokenRiskBatch`. `tokens` preserves de-duplicated input order; `count` = unique mints. */
+export interface BatchRiskResponse {
+    tokens: BatchRiskEntry[];
+    count: number;
+}
+/** A live WebSocket streaming session. Returned by `getStreamSessions`. */
+export interface StreamSession {
+    id: string;
+    service: "ws-streaming" | "dex-stream";
+    tier: string;
+    channels: string[];
+    connected_at: string;
+    remote_ip: string | null;
+    messages_sent: number;
+}
+/** Response of `getStreamSessions`. */
+export interface StreamSessionsResponse {
+    sessions: StreamSession[];
+    count: number;
+}
 export declare class MadeOnSolClient {
     private baseUrl;
     private fetchFn;
@@ -189,6 +244,25 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /** List the caller's live WebSocket streaming sessions across ws-streaming + dex-stream. PRO+. */
+    getStreamSessions(): Promise<{
+        data?: StreamSessionsResponse | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Force-evict (kill) a live WebSocket session by id — frees a connection slot.
+     * Returns `{ evicted: true, id }`; 404 if no session with that id, 400 if `id` is
+     * not a positive integer. PRO+.
+     */
+    deleteStreamSession(id: number | string): Promise<{
+        data?: {
+            evicted: true;
+            id: string;
+        } | undefined;
+        error?: string;
+        status: number;
+    }>;
     getWalletTrackerWatchlist(): Promise<{
         data?: unknown;
         error?: string;
@@ -279,9 +353,49 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /** Transparent 0–100 rug-risk/safety score (higher = riskier) with band, explainable factors, and raw inputs. PRO+. */
+    getTokenRisk(mint: string): Promise<{
+        data?: TokenRisk | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
+    getTokenCandles(mint: string, params?: {
+        tf?: string;
+        limit?: number;
+        from?: string;
+        to?: string;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Net buy/sell flow for a token over a rolling window (1h or 24h). Returns unique
+     * wallet/buyer/seller counts, buy/sell trade counts, buy/sell/net SOL, and trades-per-wallet.
+     * Default window is "1h". PRO+.
+     */
+    getTokenFlow(mint: string, params?: {
+        window?: "1h" | "24h";
+    }): Promise<{
+        data?: TokenFlow | undefined;
+        error?: string;
+        status: number;
+    }>;
     /** Bulk buyer-quality scoring for up to 50 mints. Shares the single-mint 5-min LRU cache. */
     getTokenBuyerQualityBatch(mints: string[]): Promise<{
         data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Bulk rug-risk scoring for up to 50 mints (1–50). Each entry is the single-mint
+     * risk shape plus an `as_of` ISO timestamp, or `{ mint, error: "not_tracked" }` for
+     * untracked mints (untracked mints do NOT fail the batch). `tokens` preserves
+     * de-duplicated input order; `count` = unique mints. Counts as 1 request. PRO/ULTRA only.
+     */
+    getTokenRiskBatch(mints: string[]): Promise<{
+        data?: BatchRiskResponse | undefined;
         error?: string;
         status: number;
     }>;
@@ -303,12 +417,18 @@ export declare class MadeOnSolClient {
         status: number;
     }>;
     copyTradeCreate(params: {
-        name: string;
-        source_wallet: string;
-        is_active?: boolean;
+        /** 1-50 wallets to copy trades from. */
+        source_wallets: string[];
+        /** Required. Fixed SOL amount, proportional multiplier, or percent of source — per sizing_mode. */
+        sizing_amount: number;
+        name?: string;
+        min_trade_sol?: number;
+        only_action?: "buy" | "sell" | "both";
+        sizing_mode?: "fixed" | "proportional" | "percent_source";
+        delivery_mode?: "webhook" | "websocket" | "both";
         webhook_url?: string;
-        delivery?: "webhook" | "websocket" | "both";
-        filters?: Record<string, unknown>;
+        min_mc_usd?: number | null;
+        max_mc_usd?: number | null;
     }): Promise<{
         data?: unknown;
         error?: string;
@@ -447,6 +567,28 @@ export declare class MadeOnSolClient {
         deployer_tier?: string;
         sort?: string;
         order?: string;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * v1.14 — Pre-bond pump.fun tokens approaching graduation, ranked by velocity
+     * (Δprogress/min): "95% and accelerating" beats "92% stalled". Each token is
+     * enriched with its deployer's reputation tier. `progress_pct` is from on-chain
+     * real_token_reserves; `velocity_pct_per_min` is null until a 5m snapshot exists;
+     * `eta_minutes` is a linear projection. PRO/ULTRA only.
+     */
+    getAlmostBonded(params?: {
+        min_progress?: string;
+        max_progress?: string;
+        min_velocity_pct_per_min?: string;
+        max_age_minutes?: string;
+        deployer_tier?: string;
+        authority_revoked?: string;
+        min_liq?: string;
+        sort?: string;
+        limit?: string;
     }): Promise<{
         data?: unknown;
         error?: string;

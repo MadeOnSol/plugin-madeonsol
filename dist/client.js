@@ -19,7 +19,7 @@ export class MadeOnSolClient {
         this.authHeaders = {};
         if (options.apiKey) {
             this.authMode = "madeonsol";
-            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.10.0" };
+            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.15.0" };
         }
         else if (options.fetchFn) {
             this.authMode = "x402";
@@ -147,6 +147,19 @@ export class MadeOnSolClient {
     getStreamToken() {
         return this.restRequest("POST", "/stream/token");
     }
+    // ── Live WebSocket sessions (PRO/ULTRA) ──
+    /** List the caller's live WebSocket streaming sessions across ws-streaming + dex-stream. PRO+. */
+    getStreamSessions() {
+        return this.restRequest("GET", "/stream/sessions");
+    }
+    /**
+     * Force-evict (kill) a live WebSocket session by id — frees a connection slot.
+     * Returns `{ evicted: true, id }`; 404 if no session with that id, 400 if `id` is
+     * not a positive integer. PRO+.
+     */
+    deleteStreamSession(id) {
+        return this.restRequest("DELETE", `/stream/sessions/${id}`);
+    }
     // ── Wallet Tracker ──
     getWalletTrackerWatchlist() {
         return this.restRequest("GET", "/wallet-tracker/watchlist");
@@ -215,7 +228,7 @@ export class MadeOnSolClient {
         return this.restRequest("GET", `/alpha/leaderboard${query}`);
     }
     getAlphaWallet(wallet) {
-        return this.restRequest("GET", `/alpha/wallet/${encodeURIComponent(wallet)}`);
+        return this.restRequest("GET", `/alpha/${encodeURIComponent(wallet)}`);
     }
     getAlphaLinked(wallet) {
         return this.restRequest("GET", `/alpha/${encodeURIComponent(wallet)}/linked`);
@@ -227,9 +240,45 @@ export class MadeOnSolClient {
     getTokenBuyerQuality(mint) {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/buyer-quality`);
     }
+    /** Transparent 0–100 rug-risk/safety score (higher = riskier) with band, explainable factors, and raw inputs. PRO+. */
+    getTokenRisk(mint) {
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/risk`);
+    }
+    /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
+    getTokenCandles(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.tf)
+            qs.set("tf", params.tf);
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        if (params?.from)
+            qs.set("from", params.from);
+        if (params?.to)
+            qs.set("to", params.to);
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/candles${query}`);
+    }
+    /**
+     * Net buy/sell flow for a token over a rolling window (1h or 24h). Returns unique
+     * wallet/buyer/seller counts, buy/sell trade counts, buy/sell/net SOL, and trades-per-wallet.
+     * Default window is "1h". PRO+.
+     */
+    getTokenFlow(mint, params) {
+        const qs = params?.window ? `?window=${params.window}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/flow${qs}`);
+    }
     /** Bulk buyer-quality scoring for up to 50 mints. Shares the single-mint 5-min LRU cache. */
     getTokenBuyerQualityBatch(mints) {
         return this.restRequest("POST", "/tokens/batch/buyer-quality", { mints });
+    }
+    /**
+     * Bulk rug-risk scoring for up to 50 mints (1–50). Each entry is the single-mint
+     * risk shape plus an `as_of` ISO timestamp, or `{ mint, error: "not_tracked" }` for
+     * untracked mints (untracked mints do NOT fail the batch). `tokens` preserves
+     * de-duplicated input order; `count` = unique mints. Counts as 1 request. PRO/ULTRA only.
+     */
+    getTokenRiskBatch(mints) {
+        return this.restRequest("POST", "/tokens/batch/risk", { mints });
     }
     // ── Token intelligence (/token/{mint}) ──
     /** Comprehensive per-mint snapshot: price, MC, volume, deployer, KOL activity, age, blacklist. */
@@ -242,19 +291,19 @@ export class MadeOnSolClient {
     }
     // ── Copy-Trade Rules (PRO/ULTRA) ──
     copyTradeList() {
-        return this.restRequest("GET", "/copy-trade/rules");
+        return this.restRequest("GET", "/copytrade/subscriptions");
     }
     copyTradeCreate(params) {
-        return this.restRequest("POST", "/copy-trade/rules", params);
+        return this.restRequest("POST", "/copytrade/subscriptions", params);
     }
     copyTradeGet(ruleId) {
-        return this.restRequest("GET", `/copy-trade/rules/${encodeURIComponent(ruleId)}`);
+        return this.restRequest("GET", `/copytrade/subscriptions/${encodeURIComponent(ruleId)}`);
     }
     copyTradeUpdate(ruleId, updates) {
-        return this.restRequest("PATCH", `/copy-trade/rules/${encodeURIComponent(ruleId)}`, updates);
+        return this.restRequest("PATCH", `/copytrade/subscriptions/${encodeURIComponent(ruleId)}`, updates);
     }
     copyTradeDelete(ruleId) {
-        return this.restRequest("DELETE", `/copy-trade/rules/${encodeURIComponent(ruleId)}`);
+        return this.restRequest("DELETE", `/copytrade/subscriptions/${encodeURIComponent(ruleId)}`);
     }
     // ── Coordination alerts (PRO/ULTRA, v1.1) ──
     coordinationAlertsList() {
@@ -318,6 +367,24 @@ export class MadeOnSolClient {
         const query = qs.toString() ? `?${qs.toString()}` : "";
         return this.restRequest("GET", `/tokens${query}`);
     }
+    /**
+     * v1.14 — Pre-bond pump.fun tokens approaching graduation, ranked by velocity
+     * (Δprogress/min): "95% and accelerating" beats "92% stalled". Each token is
+     * enriched with its deployer's reputation tier. `progress_pct` is from on-chain
+     * real_token_reserves; `velocity_pct_per_min` is null until a 5m snapshot exists;
+     * `eta_minutes` is a linear projection. PRO/ULTRA only.
+     */
+    getAlmostBonded(params) {
+        const qs = new URLSearchParams();
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined)
+                    qs.set(k, v);
+            }
+        }
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/almost-bonded${query}`);
+    }
     copyTradeSignals(params) {
         const qs = new URLSearchParams();
         if (params)
@@ -325,7 +392,7 @@ export class MadeOnSolClient {
                 if (v !== undefined)
                     qs.set(k, v);
         const query = qs.toString() ? `?${qs.toString()}` : "";
-        return this.restRequest("GET", `/copy-trade/signals${query}`);
+        return this.restRequest("GET", `/copytrade/signals${query}`);
     }
     // ── Price alerts (PRO/ULTRA, v1.9) ──
     priceAlertsList() {
