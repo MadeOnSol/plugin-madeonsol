@@ -46,6 +46,39 @@ export interface TokenRisk {
     }>;
     inputs?: Record<string, unknown>;
 }
+/** One bundle-cohort wallet. ULTRA callers additionally get `kol_name`, `win_rate`, `bot_confidence`, `tokens_held`. */
+export interface TokenBundleWallet {
+    rank: number;
+    wallet: string;
+    held_ratio: number | null;
+    has_sold: boolean;
+    atomic: boolean;
+    is_kol: boolean;
+    kol_name?: string;
+    win_rate?: number;
+    bot_confidence?: number;
+    tokens_held?: number;
+}
+/**
+ * Bundle-cohort holdings for a token. `held_pct_of_supply` is the headline rug/insider
+ * signal: how much of supply the same-slot "bundle" wallets STILL hold. Returned by `getTokenBundle`.
+ * BASIC/TRADER get the `bundle` block only (`wallets: []`); PRO adds top-10 flags-only wallets;
+ * ULTRA adds KOL identity + win rate + bot confidence.
+ */
+export interface TokenBundle {
+    mint: string;
+    bundle: {
+        wallet_count: number;
+        bundle_kind: "atomic_tx" | "same_slot" | "none";
+        held_ratio: number | null;
+        /** HEADLINE — fraction of total supply the bundle cohort still holds (0–1, or null). */
+        held_pct_of_supply: number | null;
+        fully_exited: boolean;
+        buy_volume: number;
+        tokens_held: number;
+    };
+    wallets: TokenBundleWallet[];
+}
 /** A per-mint entry in the batch-risk response: a risk result (with `as_of`), or an error object. */
 export type BatchRiskEntry = (TokenRisk & {
     as_of: string;
@@ -356,6 +389,18 @@ export declare class MadeOnSolClient {
     /** Transparent 0–100 rug-risk/safety score (higher = riskier) with band, explainable factors, and raw inputs. PRO+. */
     getTokenRisk(mint: string): Promise<{
         data?: TokenRisk | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Bundle-cohort holdings — which same-slot "bundle" wallets (≥3 buying in one slot)
+     * bought a token and how much of supply they STILL hold (`held_pct_of_supply` is the
+     * headline rug/insider signal, from confirmed on-chain data). BASIC/TRADER get the
+     * `bundle` summary block only (`wallets: []`); PRO adds top-10 flags-only wallets;
+     * ULTRA adds KOL identity, win rate, and bot confidence.
+     */
+    getTokenBundle(mint: string): Promise<{
+        data?: TokenBundle | undefined;
         error?: string;
         status: number;
     }>;

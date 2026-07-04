@@ -244,6 +244,16 @@ export class MadeOnSolClient {
     getTokenRisk(mint) {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/risk`);
     }
+    /**
+     * Bundle-cohort holdings — which same-slot "bundle" wallets (≥3 buying in one slot)
+     * bought a token and how much of supply they STILL hold (`held_pct_of_supply` is the
+     * headline rug/insider signal, from confirmed on-chain data). BASIC/TRADER get the
+     * `bundle` summary block only (`wallets: []`); PRO adds top-10 flags-only wallets;
+     * ULTRA adds KOL identity, win rate, and bot confidence.
+     */
+    getTokenBundle(mint) {
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/bundle`);
+    }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
         const qs = new URLSearchParams();

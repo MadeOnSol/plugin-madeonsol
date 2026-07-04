@@ -8,6 +8,7 @@ import { kolTokenEntryOrderAction } from "./actions/kol-token-entry-order.js";
 import { kolCompareAction } from "./actions/kol-compare.js";
 import { kolAlertsRecentAction } from "./actions/kol-alerts-recent.js";
 import { tokenRiskAction } from "./actions/token-risk.js";
+import { tokenBundleAction } from "./actions/token-bundle.js";
 import { tokenCandlesAction } from "./actions/token-candles.js";
 import { tokenFlowAction } from "./actions/token-flow.js";
 import { meAction } from "./actions/me.js";
@@ -34,6 +35,7 @@ export const madeOnSolPlugin: Plugin = {
     kolCompareAction,
     kolAlertsRecentAction,
     tokenRiskAction,
+    tokenBundleAction,
     tokenCandlesAction,
     tokenFlowAction,
     meAction,
@@ -96,6 +98,6 @@ export default madeOnSolPlugin;
 export { MadeOnSolClient } from "./client.js";
 export { kolFeedAction, kolCoordinationAction, kolLeaderboardAction, deployerAlertsAction };
 export { walletTrackerWatchlistAction, walletTrackerTradesAction };
-export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenCandlesAction, tokenFlowAction };
+export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenCandlesAction, tokenFlowAction };
 export { meAction, tokensListAction, almostBondedAction };
 export { walletStatsAction, walletPnlAction, walletPositionsAction, walletTradesAction };
