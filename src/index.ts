@@ -22,7 +22,7 @@ export const MADEONSOL_CLIENT_KEY = "madeonsol:client";
 export const madeOnSolPlugin: Plugin = {
   name: "madeonsol",
   description:
-    "Query Solana KOL trading intelligence and deployer analytics from MadeOnSol. Tracks 1,000+ KOL wallets and 6,700+ Pump.fun deployers.",
+    "Query Solana KOL trading intelligence and deployer analytics from MadeOnSol. Tracks 1,000+ KOL wallets and 15,500+ Pump.fun deployers.",
   actions: [
     kolFeedAction,
     kolCoordinationAction,
