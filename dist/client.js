@@ -19,7 +19,7 @@ export class MadeOnSolClient {
         this.authHeaders = {};
         if (options.apiKey) {
             this.authMode = "madeonsol";
-            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.15.0" };
+            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.16.1" };
         }
         else if (options.fetchFn) {
             this.authMode = "x402";
@@ -247,7 +247,7 @@ export class MadeOnSolClient {
     /**
      * Bundle-cohort holdings — which same-slot "bundle" wallets (≥3 buying in one slot)
      * bought a token and how much of supply they STILL hold (`held_pct_of_supply` is the
-     * headline rug/insider signal, from confirmed on-chain data). BASIC/TRADER get the
+     * headline rug/insider signal, from confirmed on-chain data). BASIC get the
      * `bundle` summary block only (`wallets: []`); PRO adds top-10 flags-only wallets;
      * ULTRA adds KOL identity, win rate, and bot confidence.
      */

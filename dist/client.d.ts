@@ -62,7 +62,7 @@ export interface TokenBundleWallet {
 /**
  * Bundle-cohort holdings for a token. `held_pct_of_supply` is the headline rug/insider
  * signal: how much of supply the same-slot "bundle" wallets STILL hold. Returned by `getTokenBundle`.
- * BASIC/TRADER get the `bundle` block only (`wallets: []`); PRO adds top-10 flags-only wallets;
+ * BASIC get the `bundle` block only (`wallets: []`); PRO adds top-10 flags-only wallets;
  * ULTRA adds KOL identity + win rate + bot confidence.
  */
 export interface TokenBundle {
@@ -395,7 +395,7 @@ export declare class MadeOnSolClient {
     /**
      * Bundle-cohort holdings — which same-slot "bundle" wallets (≥3 buying in one slot)
      * bought a token and how much of supply they STILL hold (`held_pct_of_supply` is the
-     * headline rug/insider signal, from confirmed on-chain data). BASIC/TRADER get the
+     * headline rug/insider signal, from confirmed on-chain data). BASIC get the
      * `bundle` summary block only (`wallets: []`); PRO adds top-10 flags-only wallets;
      * ULTRA adds KOL identity, win rate, and bot confidence.
      */

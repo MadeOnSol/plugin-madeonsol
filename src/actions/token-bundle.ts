@@ -11,7 +11,7 @@ const MINT_RE = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
 export const tokenBundleAction: Action = {
   name: "GET_TOKEN_BUNDLE",
   description:
-    "Get bundle-cohort holdings for a Solana token from MadeOnSol — the same-slot \"bundle\" wallets (≥3 buying in one slot) that bought a token and how much of supply they STILL hold (the rug/insider signal, from confirmed on-chain data). Returns wallet_count, bundle_kind, held_pct_of_supply (headline), fully_exited, and per-wallet flags. BASIC/TRADER get the summary block only; PRO adds top-10 flags; ULTRA adds KOL identity + win rate.",
+    "Get bundle-cohort holdings for a Solana token from MadeOnSol — the same-slot \"bundle\" wallets (≥3 buying in one slot) that bought a token and how much of supply they STILL hold (the rug/insider signal, from confirmed on-chain data). Returns wallet_count, bundle_kind, held_pct_of_supply (headline), fully_exited, and per-wallet flags. BASIC get the summary block only; PRO adds top-10 flags; ULTRA adds KOL identity + win rate.",
   similes: [
     "token bundle",
     "bundle wallets",
