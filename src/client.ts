@@ -6,6 +6,8 @@
  * Get a free `msk_` key at https://madeonsol.com/pricing.
  */
 
+import { VERSION } from "./version.js";
+
 const DEFAULT_BASE = "https://madeonsol.com";
 
 type AuthMode = "madeonsol" | "x402" | "none";
@@ -97,6 +99,60 @@ export interface BatchRiskResponse {
   count: number;
 }
 
+/** One DEX pool a token trades in. Returned inside `getTokenPools`. */
+export interface TokenPool {
+  pool_address: string;
+  dex: string;
+  quote_mint: string;
+  liquidity_usd: number;
+  last_price_sol: number;
+  last_swap_at: string;
+  amm_id: string;
+  is_active: boolean;
+}
+
+/**
+ * Per-venue liquidity map for a token — every DEX pool it trades in, live vs parked,
+ * fragmentation + top-pool share. Returned by `getTokenPools`.
+ */
+export interface TokenPools {
+  mint: string;
+  pools: TokenPool[];
+  summary: {
+    pool_count: number;
+    active_pool_count: number;
+    dex_count: number;
+    dexes: string[];
+    total_liquidity_usd: number;
+    primary_pool: string | null;
+    primary_dex: string | null;
+    top_pool_share_pct: number | null;
+  };
+}
+
+/** One daily reputation snapshot for a deployer. Returned inside `getDeployerHistory`. */
+export interface DeployerSnapshot {
+  date: string;
+  tier: string;
+  is_tracked: boolean;
+  total_deployed: number;
+  total_bonded: number;
+  bonding_rate: number;
+  recent_bond_rate: number;
+  avg_peak_mc: number;
+  best_token_peak_mc: number;
+}
+
+/**
+ * A deployer's daily reputation time-series — backtest "was this deployer elite when
+ * it launched token X?" without look-ahead bias. Returned by `getDeployerHistory`.
+ */
+export interface DeployerHistory {
+  is_deployer: boolean;
+  wallet: string;
+  snapshots: DeployerSnapshot[];
+}
+
 /** A live WebSocket streaming session. Returned by `getStreamSessions`. */
 export interface StreamSession {
   id: string;
@@ -130,7 +186,7 @@ export class MadeOnSolClient {
 
     if (options.apiKey) {
       this.authMode = "madeonsol";
-      this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.16.1" };
+      this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": `plugin-madeonsol/${VERSION}` };
     } else if (options.fetchFn) {
       this.authMode = "x402";
     } else {
@@ -252,6 +308,18 @@ export class MadeOnSolClient {
 
   getDeployerTrajectory(wallet: string) {
     return this.restRequest("GET", `/deployer-hunter/${wallet}/trajectory`);
+  }
+
+  /**
+   * A deployer's daily reputation time-series — backtest "was this deployer elite when
+   * it launched token X?" without look-ahead bias. Returns `is_deployer`, `wallet`, and
+   * `snapshots[]` (each `date`, `tier`, `is_tracked`, `total_deployed`, `total_bonded`,
+   * `bonding_rate`, `recent_bond_rate`, `avg_peak_mc`, `best_token_peak_mc`).
+   * `limit` is the number of days (1–365, default 90). PRO+.
+   */
+  getDeployerHistory(wallet: string, limit?: number) {
+    const qs = limit !== undefined ? `?limit=${limit}` : "";
+    return this.restRequest<DeployerHistory>("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/history${qs}`);
   }
 
   // ── REST helper (used by webhooks, streaming, alpha, copy-trade, wallet-tracker) ──
@@ -414,6 +482,17 @@ export class MadeOnSolClient {
    */
   getTokenBundle(mint: string) {
     return this.restRequest<TokenBundle>("GET", `/tokens/${encodeURIComponent(mint)}/bundle`);
+  }
+
+  /**
+   * Per-venue liquidity map — every DEX pool a token trades in, live vs parked, with
+   * fragmentation and top-pool share. Each pool carries `pool_address`, `dex`,
+   * `quote_mint`, `liquidity_usd`, `last_price_sol`, `last_swap_at`, `amm_id`, and
+   * `is_active`; `summary` rolls up `pool_count`, `active_pool_count`, `dex_count`,
+   * `dexes`, `total_liquidity_usd`, `primary_pool`, `primary_dex`, and `top_pool_share_pct`. PRO+.
+   */
+  getTokenPools(mint: string) {
+    return this.restRequest<TokenPools>("GET", `/tokens/${encodeURIComponent(mint)}/pools`);
   }
 
   /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */

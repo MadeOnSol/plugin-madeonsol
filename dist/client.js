@@ -5,6 +5,7 @@
  * v1.0 breaking change: RapidAPI auth has been removed (marketplace retired 2026-04-19).
  * Get a free `msk_` key at https://madeonsol.com/pricing.
  */
+import { VERSION } from "./version.js";
 const DEFAULT_BASE = "https://madeonsol.com";
 export class MadeOnSolClient {
     baseUrl;
@@ -19,7 +20,7 @@ export class MadeOnSolClient {
         this.authHeaders = {};
         if (options.apiKey) {
             this.authMode = "madeonsol";
-            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": "plugin-madeonsol/1.16.1" };
+            this.authHeaders = { Authorization: `Bearer ${options.apiKey}`, "User-Agent": `plugin-madeonsol/${VERSION}` };
         }
         else if (options.fetchFn) {
             this.authMode = "x402";
@@ -110,6 +111,17 @@ export class MadeOnSolClient {
     }
     getDeployerTrajectory(wallet) {
         return this.restRequest("GET", `/deployer-hunter/${wallet}/trajectory`);
+    }
+    /**
+     * A deployer's daily reputation time-series — backtest "was this deployer elite when
+     * it launched token X?" without look-ahead bias. Returns `is_deployer`, `wallet`, and
+     * `snapshots[]` (each `date`, `tier`, `is_tracked`, `total_deployed`, `total_bonded`,
+     * `bonding_rate`, `recent_bond_rate`, `avg_peak_mc`, `best_token_peak_mc`).
+     * `limit` is the number of days (1–365, default 90). PRO+.
+     */
+    getDeployerHistory(wallet, limit) {
+        const qs = limit !== undefined ? `?limit=${limit}` : "";
+        return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/history${qs}`);
     }
     // ── REST helper (used by webhooks, streaming, alpha, copy-trade, wallet-tracker) ──
     async restRequest(method, path, body) {
@@ -253,6 +265,16 @@ export class MadeOnSolClient {
      */
     getTokenBundle(mint) {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/bundle`);
+    }
+    /**
+     * Per-venue liquidity map — every DEX pool a token trades in, live vs parked, with
+     * fragmentation and top-pool share. Each pool carries `pool_address`, `dex`,
+     * `quote_mint`, `liquidity_usd`, `last_price_sol`, `last_swap_at`, `amm_id`, and
+     * `is_active`; `summary` rolls up `pool_count`, `active_pool_count`, `dex_count`,
+     * `dexes`, `total_liquidity_usd`, `primary_pool`, `primary_dex`, and `top_pool_share_pct`. PRO+.
+     */
+    getTokenPools(mint) {
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/pools`);
     }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
