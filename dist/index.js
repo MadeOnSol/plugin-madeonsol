@@ -15,7 +15,7 @@ import { tokenFlowAction } from "./actions/token-flow.js";
 import { meAction } from "./actions/me.js";
 import { tokensListAction } from "./actions/tokens-list.js";
 import { almostBondedAction } from "./actions/almost-bonded.js";
-import { walletStatsAction, walletPnlAction, walletPositionsAction, walletTradesAction } from "./actions/wallet.js";
+import { walletStatsAction, walletPnlAction, walletPositionsAction, walletHoldingsAction, walletTradesAction } from "./actions/wallet.js";
 import { MadeOnSolClient } from "./client.js";
 /** Key used to store the initialized client on the runtime */
 export const MADEONSOL_CLIENT_KEY = "madeonsol:client";
@@ -44,6 +44,7 @@ export const madeOnSolPlugin = {
         walletStatsAction,
         walletPnlAction,
         walletPositionsAction,
+        walletHoldingsAction,
         walletTradesAction,
     ],
     /**
@@ -94,4 +95,4 @@ export { kolFeedAction, kolCoordinationAction, kolLeaderboardAction, deployerAle
 export { walletTrackerWatchlistAction, walletTrackerTradesAction };
 export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenPoolsAction, deployerHistoryAction, tokenCandlesAction, tokenFlowAction };
 export { meAction, tokensListAction, almostBondedAction };
-export { walletStatsAction, walletPnlAction, walletPositionsAction, walletTradesAction };
+export { walletStatsAction, walletPnlAction, walletPositionsAction, walletHoldingsAction, walletTradesAction };

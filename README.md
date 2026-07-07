@@ -9,8 +9,10 @@
 
 ElizaOS plugin for [MadeOnSol](https://madeonsol.com) — Solana KOL trading intelligence, deployer analytics, and wallet tracking.
 
-> Real-time Solana trading intelligence: track 1,069 KOL wallets with <3s latency, score 23,000+ Pump.fun deployers, expose bundle-cohort held-% of supply (the rug/insider signal), surface deshred deploy signals ~500ms before on-chain confirmation, detect multi-KOL coordination, and stream every DEX trade. Free tier: 200 requests/day, every endpoint — no signup payment. Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
+> Real-time Solana trading intelligence: track 1,069 KOL wallets with <3s latency, score 23,000+ Pump.fun deployers, expose bundle-cohort held-% of supply (the rug/insider signal), verify any wallet's CURRENT on-chain holdings straight from its token accounts, surface deshred deploy signals ~500ms before on-chain confirmation, detect multi-KOL coordination, and stream every DEX trade. Free tier: 200 requests/day, every endpoint — no signup payment. Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
+> **New in 1.17.0** — **Verified on-chain wallet holdings.** New action `WALLET_HOLDINGS` + `client.getWalletHoldings(address, { limit, min_value_usd })` (`GET /wallet/{address}/holdings`) — the wallet's CURRENT holdings read straight from chain: its actual SPL + Token-2022 token accounts and SOL balance, each enriched with `price_usd` / `value_usd` / `market_cap_usd` / `name` / `symbol` / `is_bonded`, plus `transfer_delta` (on-chain amount − trade-derived net position — exposes non-swap flows like airdrops, insider funding, wallet-hopping). Distinct from `WALLET_POSITIONS` (trade-derived FIFO): this is what the wallet *actually* holds right now. `limit` 1–500 (default 200), `min_value_usd` ≥0 (default 0). Returns `{ address, sol_balance, holdings[], summary, verified_at, trade_window_days, cache_hit, ttl_seconds }`. ULTRA only.
+>
 > **New in 1.16.2** — **Per-venue pools + deployer reputation history.** Two new actions + client methods. `GET_TOKEN_POOLS` + `client.getTokenPools(mint)` (`GET /tokens/{mint}/pools`) — the per-venue liquidity map: every DEX pool a token trades in, live vs parked, with fragmentation and top-pool concentration. Each pool carries `pool_address`, `dex`, `quote_mint`, `liquidity_usd`, `last_price_sol`, `last_swap_at`, `amm_id`, `is_active`; `summary` rolls up `pool_count`, `active_pool_count`, `dex_count`, `dexes`, `total_liquidity_usd`, `primary_pool`, `primary_dex`, `top_pool_share_pct`. And `GET_DEPLOYER_HISTORY` + `client.getDeployerHistory(wallet, limit?)` (`GET /deployer-hunter/{wallet}/history?limit=N`) — a deployer's daily reputation time-series so you can backtest "was this deployer elite when it launched token X?" without look-ahead bias. Returns `is_deployer`, `wallet`, and `snapshots[]` (`date`, `tier`, `is_tracked`, `total_deployed`, `total_bonded`, `bonding_rate`, `recent_bond_rate`, `avg_peak_mc`, `best_token_peak_mc`); `limit` is days (1–365, default 90). PRO+.
 >
 > **New in 1.16.0** — **Bundle-cohort holdings.** New action `GET_TOKEN_BUNDLE` + `client.getTokenBundle(mint)` (`GET /tokens/{mint}/bundle`) — which same-slot "bundle" wallets (≥3 buying in one slot) bought a token and how much of supply they STILL hold, straight from confirmed on-chain data. The `bundle` block carries `wallet_count`, `bundle_kind` (`atomic_tx`/`same_slot`/`none`), `held_ratio`, **`held_pct_of_supply`** (the headline rug/insider signal, 0–1 or null), `fully_exited`, `buy_volume`, and `tokens_held`. Tier-gated: BASIC get the `bundle` block only (`wallets: []`); PRO adds a top-10 flags-only `wallets[]` (`rank`, `held_ratio`, `has_sold`, `atomic`, `is_kol`); ULTRA adds identity (`kol_name`, `win_rate`, `bot_confidence`, `tokens_held`).
@@ -76,6 +78,7 @@ Gives your ElizaOS agent access to MadeOnSol's Solana intelligence API.
 | `WALLET_STATS` | **New 1.8** · Stats + cross-product flags (is_kol, is_alpha_tracked + bot_confidence, is_deployer) for any wallet (PRO+) |
 | `WALLET_PNL` | **New 1.8** · Full FIFO PnL — realized + unrealized, profit factor, drawdown, hold times, top winners (PRO+) |
 | `WALLET_POSITIONS` | **New 1.8** · Open positions with live unrealized SOL from market-cap tracker (PRO+) |
+| `WALLET_HOLDINGS` | **New 1.17** · Verified CURRENT on-chain holdings (real SPL + Token-2022 accounts + SOL) enriched with price/MC/name, plus `transfer_delta` vs trade-derived position (ULTRA only) |
 | `WALLET_TRADES` | **New 1.8** · Recent trades for any wallet, filtered by action (PRO+) |
 | `GET_TOKEN_RISK` | **New 1.11** · Transparent 0–100 rug-risk/safety score with band + explainable factors (PRO+) |
 | `GET_TOKEN_CANDLES` | **New 1.12** · Historical OHLCV candles (1m–1d). PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history (PRO+) |
@@ -252,6 +255,8 @@ Your agent can then respond to queries like:
 | ULTRA | €131/mo (€1310/yr) ≈ $149 | 100 + WS events | 100,000 |
 
 Free tier returns the full REST response shape on every endpoint — real wallets, TX signatures, full precision. Paid tiers unlock webhooks, WebSockets, rule engines, and ULTRA-only data depth. Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
+
+New customers get a 5-day free trial of Pro or Ultra when you pay by card — full access, nothing charged during the trial, cancel anytime. Start at https://madeonsol.com/pricing
 
 ## Also Available
 

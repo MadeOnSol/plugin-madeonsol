@@ -243,6 +243,85 @@ export const walletPositionsAction: Action = {
   ] as Action["examples"],
 };
 
+export const walletHoldingsAction: Action = {
+  name: "WALLET_HOLDINGS",
+  description:
+    "Verified CURRENT on-chain holdings for any Solana wallet — the wallet's actual SPL + Token-2022 token accounts and SOL balance read straight from chain, enriched with price/MC/name/symbol, plus transfer_delta (on-chain amount − trade-derived net position, exposing non-swap flows like airdrops, insider funding, wallet-hopping). Distinct from WALLET_POSITIONS (trade-derived FIFO) — this is what the wallet actually holds right now. ULTRA only.",
+  similes: [
+    "wallet holdings",
+    "current holdings",
+    "on-chain holdings",
+    "what does this wallet actually hold",
+    "verified holdings",
+    "wallet balances",
+    "wallet token balances",
+  ],
+
+  validate: async (_runtime: IAgentRuntime, message: Memory): Promise<boolean> => {
+    const text = message.content?.text || "";
+    if (!extractWallet(text)) return false;
+    return /\b(holding|holdings|balance|balances|on.?chain|actually hold)\b/i.test(text);
+  },
+
+  handler: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    _state?: State,
+    _options?: unknown,
+    callback?: HandlerCallback,
+  ) => {
+    const wallet = extractWallet(message.content?.text || "");
+    if (!wallet) {
+      callback?.({ text: "Couldn't find a Solana wallet address in your message." });
+      return undefined;
+    }
+
+    const client = getClient(runtime);
+    const result = await client.getWalletHoldings(wallet);
+    if (result.error) {
+      callback?.({ text: `Error: ${result.error}` });
+      return undefined;
+    }
+
+    const data = result.data as {
+      address: string;
+      sol_balance: number;
+      holdings: Array<{ mint: string; symbol: string | null; name: string | null; amount: number; value_usd: number | null; transfer_delta: number | null }>;
+      summary: { token_accounts: number; non_zero: number; returned: number; priced: number; total_value_usd: number; truncated: boolean };
+    };
+
+    if (!data.holdings || data.holdings.length === 0) {
+      callback?.({ text: `${data.address.slice(0, 8)}… holds ${data.sol_balance?.toFixed(2) ?? "?"} SOL and no priced token holdings.`, content: data });
+      return undefined;
+    }
+
+    // Top 10 by USD value
+    const top = [...data.holdings]
+      .sort((a, b) => (b.value_usd ?? 0) - (a.value_usd ?? 0))
+      .slice(0, 10);
+
+    const lines = top.map((h) => {
+      const label = h.symbol || h.mint.slice(0, 8) + "…";
+      const val = h.value_usd != null ? `$${h.value_usd.toFixed(0)}` : "unpriced";
+      const delta = h.transfer_delta != null && Math.abs(h.transfer_delta) > 0 ? ` · Δ ${h.transfer_delta > 0 ? "+" : ""}${h.transfer_delta.toFixed(2)}` : "";
+      return `  ${label}  ${h.amount.toFixed(2)} (${val})${delta}`;
+    });
+
+    callback?.({
+      text: `${data.address.slice(0, 8)}… — ${data.sol_balance?.toFixed(2) ?? "?"} SOL + ${data.summary.non_zero} token holding(s), total $${data.summary.total_value_usd?.toFixed(0) ?? "?"}\nTop ${top.length}:\n${lines.join("\n")}`,
+      content: data,
+    });
+    return undefined;
+  },
+
+  examples: [
+    [
+      { name: "user1", content: { text: "What does wallet ASVzakePP6GNg9r95d4LPZHJDMXun6L6E4um4pu5ybJk actually hold on-chain?" } },
+      { name: "assistant", content: { text: "Current on-chain holdings..." } },
+    ],
+  ] as Action["examples"],
+};
+
 export const walletTradesAction: Action = {
   name: "WALLET_TRADES",
   description:
