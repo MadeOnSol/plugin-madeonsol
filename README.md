@@ -11,6 +11,8 @@ ElizaOS plugin for [MadeOnSol](https://madeonsol.com) — Solana KOL trading int
 
 > Real-time Solana trading intelligence: track 1,069 KOL wallets with <3s latency, score 23,000+ Pump.fun deployers, expose bundle-cohort held-% of supply (the rug/insider signal), verify any wallet's CURRENT on-chain holdings straight from its token accounts, surface deshred deploy signals ~500ms before on-chain confirmation, detect multi-KOL coordination, and stream every DEX trade. Free tier: 200 requests/day, every endpoint — no signup payment. Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
+> **New in 1.18.0** — **Wallet batch classify + token trade tape.** New action `GET_TOKEN_TRADES` + `client.getTokenTrades(mint, { limit, cursor, action, wallet, since, until })` (`GET /tokens/{mint}/trades`) — the mint-scoped trade tape: every captured trade, cursor-paginated newest first, each with `tx_signature`, `wallet_address`, `action`, `sol_amount`, `token_amount`, `price_sol`/`price_usd`, `early_buyer_rank`, `slot`, `block_time`. Default window is the **full history** (tape starts 2026-04-12; the response `coverage` block carries `history_start` + `scope` — capture is pump.fun-pipeline scoped). New client method `client.classifyWallets(wallets)` (`POST /wallet/batch/classify`, 1–100 addresses) — bulk reputation flags per wallet: `is_sniper`, `is_bundler` (lifetime), `is_dumper` (rolling 42d), `is_kol` + `kol_name`, `bot_confidence`, `dump_cluster` cohort stats. Flags are pump.fun-pipeline scoped: `false` = not observed, NOT verified clean. Wallet-profile `flags` (WALLET_STATS) gain the same `is_sniper`/`is_bundler`/`is_dumper` + `dump_cluster` fields, and **`bot_confidence` is a type fix**: it's a string enum `"none" | "low" | "medium" | "high" | null` (the old `number | null` typing never matched a real value — the API returned `null` unconditionally due to a bug, now fixed). Both PRO+.
+>
 > **New in 1.17.0** — **Verified on-chain wallet holdings.** New action `WALLET_HOLDINGS` + `client.getWalletHoldings(address, { limit, min_value_usd })` (`GET /wallet/{address}/holdings`) — the wallet's CURRENT holdings read straight from chain: its actual SPL + Token-2022 token accounts and SOL balance, each enriched with `price_usd` / `value_usd` / `market_cap_usd` / `name` / `symbol` / `is_bonded`, plus `transfer_delta` (on-chain amount − trade-derived net position — exposes non-swap flows like airdrops, insider funding, wallet-hopping). Distinct from `WALLET_POSITIONS` (trade-derived FIFO): this is what the wallet *actually* holds right now. `limit` 1–500 (default 200), `min_value_usd` ≥0 (default 0). Returns `{ address, sol_balance, holdings[], summary, verified_at, trade_window_days, cache_hit, ttl_seconds }`. ULTRA only.
 >
 > **New in 1.16.2** — **Per-venue pools + deployer reputation history.** Two new actions + client methods. `GET_TOKEN_POOLS` + `client.getTokenPools(mint)` (`GET /tokens/{mint}/pools`) — the per-venue liquidity map: every DEX pool a token trades in, live vs parked, with fragmentation and top-pool concentration. Each pool carries `pool_address`, `dex`, `quote_mint`, `liquidity_usd`, `last_price_sol`, `last_swap_at`, `amm_id`, `is_active`; `summary` rolls up `pool_count`, `active_pool_count`, `dex_count`, `dexes`, `total_liquidity_usd`, `primary_pool`, `primary_dex`, `top_pool_share_pct`. And `GET_DEPLOYER_HISTORY` + `client.getDeployerHistory(wallet, limit?)` (`GET /deployer-hunter/{wallet}/history?limit=N`) — a deployer's daily reputation time-series so you can backtest "was this deployer elite when it launched token X?" without look-ahead bias. Returns `is_deployer`, `wallet`, and `snapshots[]` (`date`, `tier`, `is_tracked`, `total_deployed`, `total_bonded`, `bonding_rate`, `recent_bond_rate`, `avg_peak_mc`, `best_token_peak_mc`); `limit` is days (1–365, default 90). PRO+.
@@ -75,7 +77,7 @@ Gives your ElizaOS agent access to MadeOnSol's Solana intelligence API.
 | `GET_MADEONSOL_ACCOUNT` | Your tier, daily quota, burst limit, and slot usage *(new in 1.7.0)* |
 | `LIST_MADEONSOL_TOKENS` | Scan tokens by MC, liquidity, 1h momentum, primary DEX, plus momentum sorts (`mc_change_5m_desc`/`mc_change_1h_desc`/`volume_1h_desc`/`trending`) *(new in 1.7.0)* |
 | `MADEONSOL_ALMOST_BONDED` | **New 1.14** · Pre-bond pump.fun tokens near graduation, ranked by velocity — `progress_pct`, `velocity_pct_per_min`, `eta_minutes`, `stalled`, `deployer_tier` (PRO+) |
-| `WALLET_STATS` | **New 1.8** · Stats + cross-product flags (is_kol, is_alpha_tracked + bot_confidence, is_deployer) for any wallet (PRO+) |
+| `WALLET_STATS` | **New 1.8** · Stats + cross-product flags (is_kol, is_alpha_tracked + bot_confidence, is_deployer; **1.18** adds is_sniper/is_bundler/is_dumper + dump_cluster) for any wallet (PRO+) |
 | `WALLET_PNL` | **New 1.8** · Full FIFO PnL — realized + unrealized, profit factor, drawdown, hold times, top winners (PRO+) |
 | `WALLET_POSITIONS` | **New 1.8** · Open positions with live unrealized SOL from market-cap tracker (PRO+) |
 | `WALLET_HOLDINGS` | **New 1.17** · Verified CURRENT on-chain holdings (real SPL + Token-2022 accounts + SOL) enriched with price/MC/name, plus `transfer_delta` vs trade-derived position (ULTRA only) |
@@ -83,6 +85,7 @@ Gives your ElizaOS agent access to MadeOnSol's Solana intelligence API.
 | `GET_TOKEN_RISK` | **New 1.11** · Transparent 0–100 rug-risk/safety score with band + explainable factors (PRO+) |
 | `GET_TOKEN_CANDLES` | **New 1.12** · Historical OHLCV candles (1m–1d). PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history (PRO+) |
 | `GET_TOKEN_FLOW` | **New 1.13** · Net buy/sell flow over a 1h/24h window — unique wallets/buyers/sellers, buy/sell counts, buy/sell/net SOL, trades-per-wallet (PRO+) |
+| `GET_TOKEN_TRADES` | **New 1.18** · Mint-scoped trade tape — cursor-paginated raw trades with price + early-buyer rank, full history (starts 2026-04-12, pump.fun-pipeline scoped) (PRO+) |
 | `GET_TOKEN_BUNDLE` | **New 1.16** · Bundle-cohort holdings — same-slot "bundle" wallets and their `held_pct_of_supply` (rug/insider signal). BASIC=summary; PRO=top-10 flags; ULTRA=+KOL identity |
 | `GET_TOKEN_POOLS` | **New 1.16.2** · Per-venue liquidity map — every DEX pool a token trades in, live vs parked, plus fragmentation + top-pool share (PRO+) |
 | `GET_DEPLOYER_HISTORY` | **New 1.16.2** · A deployer's daily reputation time-series (`tier`, `bonding_rate`, `avg_peak_mc`…) — backtest "was this deployer elite when it launched?" without look-ahead bias (PRO+) |
@@ -233,6 +236,23 @@ const { data: s } = await client.getStreamSessions();
 // { sessions: [ { id, service, tier, channels, connected_at, remote_ip, messages_sent } ], count }
 await client.deleteStreamSession(s.sessions[0].id); // → { evicted: true, id }
 ```
+
+### Wallet batch classify *(new in 1.18)*
+
+Bulk reputation flags for 1–100 wallets in one request — client-only (like batch risk), PRO+.
+
+```ts
+import { MadeOnSolClient } from "@madeonsol/plugin-madeonsol";
+const client = new MadeOnSolClient({ apiKey: process.env.MADEONSOL_API_KEY });
+
+const { data } = await client.classifyWallets([buyerA, buyerB, buyerC]);
+// { wallets: [ { address, is_sniper, is_bundler, is_dumper, is_kol, kol_name,
+//                bot_confidence: "none"|"low"|"medium"|"high"|null,
+//                dump_cluster: { dump_cohorts, runner_cohorts, total_cohorts, as_of } | null } ],
+//   count, as_of }
+```
+
+> **Semantics** — flags are pump.fun-pipeline scoped: `false` means "not observed by our pipeline", NOT verified clean. `is_bundler` is a lifetime flag; `is_dumper` is a rolling 42-day window.
 
 ### Wallet derived stats *(new in 1.9)*
 

@@ -153,6 +153,67 @@ export interface DeployerHistory {
   snapshots: DeployerSnapshot[];
 }
 
+/** Rolling dump-cluster stats for a wallet (trailing 42 days, refreshed daily). `null` = no cohort record. */
+export interface DumpClusterStats {
+  dump_cohorts: number;
+  runner_cohorts: number;
+  total_cohorts: number;
+  as_of: string;
+}
+
+/**
+ * One wallet's reputation flags. Values match the `flags` block of `getWalletStats` exactly.
+ * All flags are pump.fun-pipeline scoped — `false` means "not observed by our pipeline",
+ * NOT verified clean. `is_bundler` is a lifetime flag; `is_dumper` is a rolling 42-day window.
+ */
+export interface WalletClassification {
+  address: string;
+  is_sniper: boolean;
+  is_bundler: boolean;
+  is_dumper: boolean;
+  is_kol: boolean;
+  kol_name: string | null;
+  /** Bot-likelihood grade — a STRING enum, never a number. */
+  bot_confidence: "none" | "low" | "medium" | "high" | null;
+  dump_cluster: DumpClusterStats | null;
+}
+
+/** Response of `classifyWallets`. */
+export interface WalletClassifyResponse {
+  wallets: WalletClassification[];
+  count: number;
+  as_of: string;
+}
+
+/** One trade on a token's trade tape. Returned inside `getTokenTrades`. */
+export interface TokenTradeEntry {
+  tx_signature: string;
+  wallet_address: string;
+  action: "buy" | "sell";
+  sol_amount: number;
+  token_amount: number;
+  price_sol: number | null;
+  price_usd: number | null;
+  early_buyer_rank: number | null;
+  slot: number | null;
+  block_time: number;
+  traded_at: string;
+}
+
+/**
+ * Mint-scoped trade tape (cursor-paginated, newest first). `coverage` is the honesty
+ * block: the tape starts 2026-04-12 (`history_start`, unix sec) and is pump.fun-pipeline
+ * scoped (`scope`) — trades outside that pipeline are not on the tape. Returned by `getTokenTrades`.
+ */
+export interface TokenTrades {
+  mint: string;
+  trades: TokenTradeEntry[];
+  next_cursor: string | null;
+  has_more: boolean;
+  filters: { action: "buy" | "sell" | null; wallet: string | null; since: number; until: number };
+  coverage: { history_start: number; scope: string };
+}
+
 /** A live WebSocket streaming session. Returned by `getStreamSessions`. */
 export interface StreamSession {
   id: string;
@@ -447,6 +508,36 @@ export class MadeOnSolClient {
     if (params?.until !== undefined) qs.set("until", String(params.until));
     const query = qs.toString() ? `?${qs.toString()}` : "";
     return this.restRequest("GET", `/wallet/${encodeURIComponent(address)}/trades${query}`);
+  }
+
+  /**
+   * Bulk wallet reputation flags for 1–100 addresses in one request (POST /wallet/batch/classify).
+   * Each entry matches the `flags` block of `getWalletStats`: `is_sniper`, `is_bundler` (lifetime),
+   * `is_dumper` (rolling 42d), `is_kol` + `kol_name`, `bot_confidence` ("none"/"low"/"medium"/"high"
+   * string enum), and `dump_cluster` cohort stats. Flags are pump.fun-pipeline scoped — `false`
+   * means "not observed", NOT verified clean. PRO+.
+   */
+  classifyWallets(wallets: string[]) {
+    return this.restRequest<WalletClassifyResponse>("POST", "/wallet/batch/classify", { wallets });
+  }
+
+  /**
+   * Mint-scoped trade tape — every captured trade for a token, cursor-paginated newest first
+   * (GET /tokens/{mint}/trades). Filter by `action`, `wallet`, and a `since`/`until` unix-seconds
+   * window; unlike `getWalletTrades` (90-day default) the default window is the FULL history.
+   * Coverage honesty: the tape starts 2026-04-12 and is pump.fun-pipeline scoped — see the
+   * response's `coverage` block. PRO+.
+   */
+  getTokenTrades(mint: string, params?: { limit?: number; cursor?: string; action?: "buy" | "sell"; wallet?: string; since?: number; until?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params?.cursor) qs.set("cursor", params.cursor);
+    if (params?.action) qs.set("action", params.action);
+    if (params?.wallet) qs.set("wallet", params.wallet);
+    if (params?.since !== undefined) qs.set("since", String(params.since));
+    if (params?.until !== undefined) qs.set("until", String(params.until));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenTrades>("GET", `/tokens/${encodeURIComponent(mint)}/trades${query}`);
   }
 
   getWalletTrackerSummary(params?: { period?: string; wallet?: string }) {

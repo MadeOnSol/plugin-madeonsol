@@ -237,6 +237,40 @@ export class MadeOnSolClient {
         const query = qs.toString() ? `?${qs.toString()}` : "";
         return this.restRequest("GET", `/wallet/${encodeURIComponent(address)}/trades${query}`);
     }
+    /**
+     * Bulk wallet reputation flags for 1–100 addresses in one request (POST /wallet/batch/classify).
+     * Each entry matches the `flags` block of `getWalletStats`: `is_sniper`, `is_bundler` (lifetime),
+     * `is_dumper` (rolling 42d), `is_kol` + `kol_name`, `bot_confidence` ("none"/"low"/"medium"/"high"
+     * string enum), and `dump_cluster` cohort stats. Flags are pump.fun-pipeline scoped — `false`
+     * means "not observed", NOT verified clean. PRO+.
+     */
+    classifyWallets(wallets) {
+        return this.restRequest("POST", "/wallet/batch/classify", { wallets });
+    }
+    /**
+     * Mint-scoped trade tape — every captured trade for a token, cursor-paginated newest first
+     * (GET /tokens/{mint}/trades). Filter by `action`, `wallet`, and a `since`/`until` unix-seconds
+     * window; unlike `getWalletTrades` (90-day default) the default window is the FULL history.
+     * Coverage honesty: the tape starts 2026-04-12 and is pump.fun-pipeline scoped — see the
+     * response's `coverage` block. PRO+.
+     */
+    getTokenTrades(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        if (params?.cursor)
+            qs.set("cursor", params.cursor);
+        if (params?.action)
+            qs.set("action", params.action);
+        if (params?.wallet)
+            qs.set("wallet", params.wallet);
+        if (params?.since !== undefined)
+            qs.set("since", String(params.since));
+        if (params?.until !== undefined)
+            qs.set("until", String(params.until));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/trades${query}`);
+    }
     getWalletTrackerSummary(params) {
         const qs = new URLSearchParams();
         if (params?.period)

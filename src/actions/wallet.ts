@@ -57,7 +57,9 @@ export const walletStatsAction: Action = {
     const data = result.data as {
       address: string;
       stats: { total_trades: number; buys: number; sells: number; bought_sol: number; sold_sol: number; unique_tokens: number; first_seen: string; last_seen: string } | null;
-      flags: { is_kol: boolean; kol_name: string | null; is_alpha_tracked: boolean; bot_confidence: number | null; alpha_win_rate: number | null; is_deployer: boolean };
+      // bot_confidence is a STRING enum (v1.18 fix — the API never returned a number).
+      // Reputation flags are pump.fun-pipeline scoped: false = not observed, NOT verified clean.
+      flags: { is_kol: boolean; kol_name: string | null; is_alpha_tracked: boolean; bot_confidence: "none" | "low" | "medium" | "high" | null; alpha_win_rate: number | null; is_deployer: boolean; is_sniper?: boolean; is_bundler?: boolean; is_dumper?: boolean };
     };
 
     const flagSummary: string[] = [];
@@ -65,10 +67,13 @@ export const walletStatsAction: Action = {
     if (data.flags.is_alpha_tracked && data.flags.alpha_win_rate != null) {
       flagSummary.push(`alpha (${(data.flags.alpha_win_rate * 100).toFixed(0)}% wr)`);
     }
-    if (data.flags.bot_confidence != null && data.flags.bot_confidence > 0.5) {
-      flagSummary.push(`likely bot (${(data.flags.bot_confidence * 100).toFixed(0)}% conf)`);
+    if (data.flags.bot_confidence === "medium" || data.flags.bot_confidence === "high") {
+      flagSummary.push(`likely bot (${data.flags.bot_confidence} confidence)`);
     }
     if (data.flags.is_deployer) flagSummary.push("deployer");
+    if (data.flags.is_sniper) flagSummary.push("sniper");
+    if (data.flags.is_bundler) flagSummary.push("bundler");
+    if (data.flags.is_dumper) flagSummary.push("dump-cluster");
 
     const tradeSummary = data.stats
       ? `${data.stats.total_trades} trades across ${data.stats.unique_tokens} tokens · ${data.stats.bought_sol.toFixed(1)} SOL in / ${data.stats.sold_sol.toFixed(1)} SOL out (90d)`

@@ -46,11 +46,17 @@ export const walletStatsAction = {
         if (data.flags.is_alpha_tracked && data.flags.alpha_win_rate != null) {
             flagSummary.push(`alpha (${(data.flags.alpha_win_rate * 100).toFixed(0)}% wr)`);
         }
-        if (data.flags.bot_confidence != null && data.flags.bot_confidence > 0.5) {
-            flagSummary.push(`likely bot (${(data.flags.bot_confidence * 100).toFixed(0)}% conf)`);
+        if (data.flags.bot_confidence === "medium" || data.flags.bot_confidence === "high") {
+            flagSummary.push(`likely bot (${data.flags.bot_confidence} confidence)`);
         }
         if (data.flags.is_deployer)
             flagSummary.push("deployer");
+        if (data.flags.is_sniper)
+            flagSummary.push("sniper");
+        if (data.flags.is_bundler)
+            flagSummary.push("bundler");
+        if (data.flags.is_dumper)
+            flagSummary.push("dump-cluster");
         const tradeSummary = data.stats
             ? `${data.stats.total_trades} trades across ${data.stats.unique_tokens} tokens · ${data.stats.bought_sol.toFixed(1)} SOL in / ${data.stats.sold_sol.toFixed(1)} SOL out (90d)`
             : "no recorded trades in the 90d window";
