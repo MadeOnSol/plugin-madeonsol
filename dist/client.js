@@ -327,6 +327,25 @@ export class MadeOnSolClient {
     getTokenPools(mint) {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/pools`);
     }
+    /**
+     * Per-pool price-impact / slippage — "how much SOL moves this token's price N%"
+     * and the impact of each buy size, per pool (NOT router-optimal). Each computable
+     * pool carries `spot_price_sol`, `fee_pct`, a `quotes[]` entry per requested SOL
+     * size (`tokens_out`, `avg_price_sol`, `price_impact_pct`), and `to_move_price`
+     * (SOL to move price 1%/5%/10%). Constant-product pools come from stream reserves
+     * (`source: "stream"`); pump.fun/bonk curves from a live read of the curve's
+     * virtual reserves (`source: "live_rpc"`). Pools we can't price honestly (CLMM/
+     * Orca/DLMM, Meteora-DBC, unclassified) land in `unsupported_pools[]` with a
+     * `reason` instead of a wrong number. `sizes` — up to 8 SOL buy sizes (each >0
+     * and ≤10000; default [0.5, 1, 5, 10]). PRO+.
+     */
+    getTokenDepth(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.sizes && params.sizes.length > 0)
+            qs.set("sizes", params.sizes.join(","));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/depth${query}`);
+    }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
         const qs = new URLSearchParams();

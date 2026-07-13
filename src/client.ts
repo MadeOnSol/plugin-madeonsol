@@ -44,6 +44,35 @@ export interface TokenFlow {
   trades_per_wallet: number;
 }
 
+/**
+ * Deployer self-activity block on `getTokenRisk` (v1.19). Create-tx self-buy snapshot +
+ * dev-sell rollup + a LIVE on-chain holdings check ("is the dev wallet empty NOW").
+ * `null` on the parent means the mint has no deployer-pipeline row — absent, not clean.
+ */
+export interface TokenRiskDev {
+  wallet: string | null;
+  launchpad: string | null;
+  deployed_at: string | null;
+  /** Create-tx self-buy snapshot — null on rows pre-dating the rollup or launchlab. */
+  buy_sol: number | null;
+  buy_tokens: number | null;
+  buy_supply_pct: number | null;
+  /** Post-create buys on the dev's own mint (catches the same-second-separate-tx dev buy). */
+  bought_tokens_after: number | null;
+  sold_tokens: number | null;
+  sold_sol: number | null;
+  first_sell_at: string | null;
+  last_sell_at: string | null;
+  /** Live on-chain holdings (cached RPC read); null = RPC unavailable right now. */
+  holdings_tokens: number | null;
+  /** Holdings as % of supply — pump.fun 1B denominator; null for other launchpads. */
+  holdings_supply_pct: number | null;
+  /** Is the dev wallet empty NOW (<1 token)? null when holdings unknown. */
+  wallet_empty: boolean | null;
+  /** Tokens left the dev wallet WITHOUT a sell; null = unknown, never a guess. */
+  transferred_out: boolean | null;
+}
+
 /** Transparent 0–100 rug-risk/safety score (higher = riskier). Returned by `getTokenRisk`. */
 export interface TokenRisk {
   mint: string;
@@ -51,6 +80,9 @@ export interface TokenRisk {
   band: string;
   factors?: Array<{ label: string; status: string; detail: string }>;
   inputs?: Record<string, unknown>;
+  /** v1.19 — deployer self-activity block (null = no deployer-pipeline row). Single-mint endpoint only. */
+  dev?: TokenRiskDev | null;
+  as_of?: string;
 }
 
 /** One bundle-cohort wallet. ULTRA callers additionally get `kol_name`, `win_rate`, `bot_confidence`, `tokens_held`. */
@@ -128,6 +160,61 @@ export interface TokenPools {
     primary_dex: string | null;
     top_pool_share_pct: number | null;
   };
+}
+
+/** One buy-size quote inside a `getTokenDepth` pool. */
+export interface TokenDepthQuote {
+  size_sol: number;
+  tokens_out: number;
+  avg_price_sol: number;
+  price_impact_pct: number;
+}
+
+/** A pool with computable depth, inside `getTokenDepth`. */
+export interface TokenDepthPool {
+  pool_address: string;
+  dex: string;
+  quote_mint: string;
+  pool_model: string | null;
+  liquidity_usd: number | null;
+  is_active: boolean;
+  depth_available: true;
+  model: string;
+  fee_pct: number;
+  /** "stream" = stored stream reserves; "live_rpc" = live curve virtual reserves (pump.fun/bonk). */
+  source: "stream" | "live_rpc";
+  reserves_age_ms: number;
+  spot_price_sol: number;
+  quotes: TokenDepthQuote[];
+  /** SOL required to move the pool's spot price by 1% / 5% / 10%. */
+  to_move_price: { "1pct": number; "5pct": number; "10pct": number };
+}
+
+/** A tracked pool we can't compute depth for — honesty marker with a `reason`. */
+export interface TokenDepthUnsupportedPool {
+  pool_address: string;
+  dex: string;
+  quote_mint: string;
+  pool_model: string | null;
+  liquidity_usd: number | null;
+  is_active: boolean;
+  reason: string;
+}
+
+/**
+ * Per-pool price-impact / slippage for a token — "how much SOL to move price N%".
+ * Impact is per-pool, NOT router-optimal. Returned by `getTokenDepth`.
+ * `found: false` (empty pools) means no pools are tracked for the mint.
+ */
+export interface TokenDepth {
+  mint: string;
+  found: boolean;
+  sol_usd?: number | null;
+  sizes_sol: number[];
+  primary_pool?: string | null;
+  pools: TokenDepthPool[];
+  unsupported_pools: TokenDepthUnsupportedPool[];
+  note?: string;
 }
 
 /** One daily reputation snapshot for a deployer. Returned inside `getDeployerHistory`. */
@@ -600,6 +687,25 @@ export class MadeOnSolClient {
    */
   getTokenPools(mint: string) {
     return this.restRequest<TokenPools>("GET", `/tokens/${encodeURIComponent(mint)}/pools`);
+  }
+
+  /**
+   * Per-pool price-impact / slippage — "how much SOL moves this token's price N%"
+   * and the impact of each buy size, per pool (NOT router-optimal). Each computable
+   * pool carries `spot_price_sol`, `fee_pct`, a `quotes[]` entry per requested SOL
+   * size (`tokens_out`, `avg_price_sol`, `price_impact_pct`), and `to_move_price`
+   * (SOL to move price 1%/5%/10%). Constant-product pools come from stream reserves
+   * (`source: "stream"`); pump.fun/bonk curves from a live read of the curve's
+   * virtual reserves (`source: "live_rpc"`). Pools we can't price honestly (CLMM/
+   * Orca/DLMM, Meteora-DBC, unclassified) land in `unsupported_pools[]` with a
+   * `reason` instead of a wrong number. `sizes` — up to 8 SOL buy sizes (each >0
+   * and ≤10000; default [0.5, 1, 5, 10]). PRO+.
+   */
+  getTokenDepth(mint: string, params?: { sizes?: number[] }) {
+    const qs = new URLSearchParams();
+    if (params?.sizes && params.sizes.length > 0) qs.set("sizes", params.sizes.join(","));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenDepth>("GET", `/tokens/${encodeURIComponent(mint)}/depth${query}`);
   }
 
   /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
