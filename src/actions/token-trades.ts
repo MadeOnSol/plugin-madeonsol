@@ -60,7 +60,7 @@ export const tokenTradesAction: Action = {
       trades: Array<{ tx_signature: string; wallet_address: string; action: "buy" | "sell"; sol_amount: number; token_amount: number; price_sol: number | null; price_usd: number | null; early_buyer_rank: number | null; slot: number | null; block_time: number; traded_at: string }>;
       next_cursor: string | null;
       has_more: boolean;
-      coverage: { history_start: number; scope: string };
+      coverage: { history_start: number; scope: string; in_scope?: boolean | null; note?: string };
     };
 
     if (!data.trades || data.trades.length === 0) {

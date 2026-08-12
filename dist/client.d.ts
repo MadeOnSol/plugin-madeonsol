@@ -33,6 +33,8 @@ export interface TokenFlow {
     sell_sol: number;
     net_sol: number;
     trades_per_wallet: number;
+    /** v1.19.4 — trade-coverage disclosure; when `in_scope` is false the zero counts mean "not covered", not "no activity". */
+    coverage?: TradeCoverage;
 }
 /**
  * Deployer self-activity block on `getTokenRisk` (v1.19). Create-tx self-buy snapshot +
@@ -62,6 +64,20 @@ export interface TokenRiskDev {
     /** Tokens left the dev wallet WITHOUT a sell; null = unknown, never a guess. */
     transferred_out: boolean | null;
 }
+/**
+ * Trade-coverage honesty block (v1.19.4). The trade tape starts 2026-04-12
+ * (`history_start`, unix sec) and is launchpad-pipeline scoped (`scope`).
+ * `in_scope`: `true` = persisted trades exist for the mint/wallet · `false` =
+ * outside the write-gate (read zeros as "not covered", NOT "no activity") ·
+ * `null` = probe unavailable. `note` explains the gap when `in_scope` is
+ * `false`/`null`. Absent on older cached responses.
+ */
+export type TradeCoverage = {
+    history_start: number;
+    scope: string;
+    in_scope?: boolean | null;
+    note?: string;
+};
 /** Transparent 0–100 rug-risk/safety score (higher = riskier). Returned by `getTokenRisk`. */
 export interface TokenRisk {
     mint: string;
@@ -75,6 +91,8 @@ export interface TokenRisk {
     inputs?: Record<string, unknown>;
     /** v1.19 — deployer self-activity block (null = no deployer-pipeline row). Single-mint endpoint only. */
     dev?: TokenRiskDev | null;
+    /** v1.19.4 — trade-coverage disclosure (single-mint endpoint). Its `note` names the split: trade-derived sub-fields are pipeline-scoped, on-chain sub-fields are unaffected. */
+    coverage?: TradeCoverage;
     as_of?: string;
 }
 /** One bundle-cohort wallet. ULTRA callers additionally get `kol_name`, `win_rate`, `bot_confidence`, `tokens_held`. */
@@ -109,6 +127,8 @@ export interface TokenBundle {
         tokens_held: number;
     };
     wallets: TokenBundleWallet[];
+    /** v1.19.4 — trade-coverage disclosure (absent on older cached responses). */
+    coverage?: TradeCoverage;
 }
 /** A per-mint entry in the batch-risk response: a risk result (with `as_of`), or an error object. */
 export type BatchRiskEntry = (TokenRisk & {
@@ -286,10 +306,7 @@ export interface TokenTrades {
         since: number;
         until: number;
     };
-    coverage: {
-        history_start: number;
-        scope: string;
-    };
+    coverage: TradeCoverage;
 }
 /** A live WebSocket streaming session. Returned by `getStreamSessions`. */
 export interface StreamSession {
