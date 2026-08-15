@@ -10,6 +10,23 @@ import { VERSION } from "./version.js";
 
 const DEFAULT_BASE = "https://madeonsol.com";
 
+/**
+ * Build a query string from optional params, dropping anything unset.
+ *
+ * An omitted argument must not reach the wire: the routes use strict Zod
+ * schemas, so `?tier=` (empty) is rejected with a 400 rather than read as
+ * "not supplied".
+ */
+function buildQs(params?: Record<string, string | number | boolean | undefined>): string {
+  if (!params) return "";
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) sp.set(k, String(v));
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
 type AuthMode = "madeonsol" | "x402" | "none";
 
 export interface MadeOnSolClientOptions {
@@ -489,6 +506,62 @@ export class MadeOnSolClient {
   getDeployerHistory(wallet: string, limit?: number) {
     const qs = limit !== undefined ? `?limit=${limit}` : "";
     return this.restRequest<DeployerHistory>("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/history${qs}`);
+  }
+
+  // ── Deployer hunter: reputation, leaderboard, outcomes (msk_ key only) ──
+  //
+  // "Bonding" is the pump.fun graduation event. `bonding_rate` is LIFETIME,
+  // `recent_bond_rate` is the ROLLING recent window — the gap between them is
+  // the signal, not either alone. `runner_rate` needs `labeled_tokens >= 3`.
+
+  /** Chain-wide deployer stats — tracked count, bonds detected, bond rate, tier counts. */
+  getDeployerStats() {
+    return this.restRequest("GET", "/deployer-hunter/stats");
+  }
+
+  /**
+   * Deployer reputation leaderboard, excluding unranked deployers. Compare
+   * `bonding_rate` (lifetime) against `recent_bond_rate` (rolling) — a deployer
+   * at 0.40 lifetime and 0.05 recent is cooling off.
+   */
+  getDeployerLeaderboard(params?: { tier?: string; sort?: string; limit?: number; offset?: number }) {
+    const qs = buildQs(params);
+    return this.restRequest("GET", `/deployer-hunter/leaderboard${qs}`);
+  }
+
+  /**
+   * One deployer's profile. An UNTRACKED wallet returns zeroed counters, not a
+   * 404 — check `total_deployed` before drawing a conclusion.
+   */
+  getDeployerProfile(wallet: string) {
+    return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}`);
+  }
+
+  /** Every token one deployer launched, with time-to-bond and peak MC. */
+  getDeployerTokens(wallet: string, params?: { limit?: number; offset?: number; only_bonded?: boolean }) {
+    const qs = buildQs(params);
+    return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/tokens${qs}`);
+  }
+
+  /** Alert volume plus per-tier bond-rate and MC-multiplier distributions. */
+  getDeployerAlertStats(params?: { period?: string }) {
+    const qs = buildQs(params);
+    return this.restRequest("GET", `/deployer-hunter/alert-stats${qs}`);
+  }
+
+  /** Best recent tokens from ranked (non-unranked) deployers, by peak MC multiple. */
+  getDeployerBestTokens(params?: { period?: string; limit?: number }) {
+    const qs = buildQs(params);
+    return this.restRequest("GET", `/deployer-hunter/best-tokens${qs}`);
+  }
+
+  /**
+   * Fresh graduations from tracked deployers. Poll incrementally: pass the
+   * previous response's `next_since` back as `since`.
+   */
+  getDeployerRecentBonds(params?: { limit?: number; since?: string; tier?: string; peak_mc_min?: number }) {
+    const qs = buildQs(params);
+    return this.restRequest("GET", `/deployer-hunter/recent-bonds${qs}`);
   }
 
   // ── REST helper (used by webhooks, streaming, alpha, copy-trade, wallet-tracker) ──

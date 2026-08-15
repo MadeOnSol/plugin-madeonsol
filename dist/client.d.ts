@@ -476,6 +476,77 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /** Chain-wide deployer stats — tracked count, bonds detected, bond rate, tier counts. */
+    getDeployerStats(): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Deployer reputation leaderboard, excluding unranked deployers. Compare
+     * `bonding_rate` (lifetime) against `recent_bond_rate` (rolling) — a deployer
+     * at 0.40 lifetime and 0.05 recent is cooling off.
+     */
+    getDeployerLeaderboard(params?: {
+        tier?: string;
+        sort?: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * One deployer's profile. An UNTRACKED wallet returns zeroed counters, not a
+     * 404 — check `total_deployed` before drawing a conclusion.
+     */
+    getDeployerProfile(wallet: string): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Every token one deployer launched, with time-to-bond and peak MC. */
+    getDeployerTokens(wallet: string, params?: {
+        limit?: number;
+        offset?: number;
+        only_bonded?: boolean;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Alert volume plus per-tier bond-rate and MC-multiplier distributions. */
+    getDeployerAlertStats(params?: {
+        period?: string;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Best recent tokens from ranked (non-unranked) deployers, by peak MC multiple. */
+    getDeployerBestTokens(params?: {
+        period?: string;
+        limit?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Fresh graduations from tracked deployers. Poll incrementally: pass the
+     * previous response's `next_since` back as `since`.
+     */
+    getDeployerRecentBonds(params?: {
+        limit?: number;
+        since?: string;
+        tier?: string;
+        peak_mc_min?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
     private restRequest;
     createWebhook(params: {
         url: string;
