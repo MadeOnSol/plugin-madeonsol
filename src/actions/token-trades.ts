@@ -57,7 +57,12 @@ export const tokenTradesAction: Action = {
 
     const data = result.data as {
       mint: string;
-      trades: Array<{ tx_signature: string; wallet_address: string; action: "buy" | "sell"; sol_amount: number; token_amount: number; price_sol: number | null; price_usd: number | null; early_buyer_rank: number | null; slot: number | null; block_time: number; traded_at: string }>;
+      // price_sol/price_usd = THIS trade's executed price (sol_amount / token_amount,
+      // the trader's all-in rate incl. swap fee and any account rent — not the pool
+      // mid). market_price_* = the canonical pool price near that slot, shared by
+      // every trade in it. Split 2026-08-16; before that price_sol carried the
+      // canonical value and disagreed with the row's own amounts.
+      trades: Array<{ tx_signature: string; wallet_address: string; action: "buy" | "sell"; sol_amount: number; token_amount: number; price_sol: number | null; price_usd: number | null; market_price_sol: number | null; market_price_usd: number | null; early_buyer_rank: number | null; slot: number | null; block_time: number; traded_at: string }>;
       next_cursor: string | null;
       has_more: boolean;
       coverage: { history_start: number; scope: string; in_scope?: boolean | null; note?: string };
@@ -70,7 +75,10 @@ export const tokenTradesAction: Action = {
 
     const lines = data.trades.slice(0, 15).map((t) => {
       const rank = t.early_buyer_rank != null ? `  #${t.early_buyer_rank} early` : "";
-      return `  ${t.traded_at.slice(0, 16).replace("T", " ")}  ${t.action.toUpperCase()}  ${t.sol_amount.toFixed(2)} SOL  ${t.wallet_address.slice(0, 6)}…${rank}`;
+      // Executed price, not the market price — this is what the wallet actually
+      // paid per token. null for dust / zero-SOL legs (a rugged sell).
+      const px = t.price_sol != null ? `  @ ${t.price_sol.toExponential(3)} SOL` : "";
+      return `  ${t.traded_at.slice(0, 16).replace("T", " ")}  ${t.action.toUpperCase()}  ${t.sol_amount.toFixed(2)} SOL${px}  ${t.wallet_address.slice(0, 6)}…${rank}`;
     });
 
     callback?.({

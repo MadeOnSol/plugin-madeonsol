@@ -317,8 +317,19 @@ export interface TokenTradeEntry {
   action: "buy" | "sell";
   sol_amount: number;
   token_amount: number;
+  /** THIS trade's executed price: `sol_amount / token_amount`. Because `sol_amount`
+   *  is the wallet's net SOL movement, it is the trader's all-in effective rate —
+   *  swap fee and any account rent included — not the pool mid. `null` for dust and
+   *  zero-SOL legs. Split from the canonical price on 2026-08-16. */
   price_sol: number | null;
+  /** {@link TokenTradeEntry.price_sol} in USD. */
   price_usd: number | null;
+  /** Canonical pool price sampled near this trade's slot — one value per token per
+   *  update, so every trade in a slot shares it. Use for a per-token series; use
+   *  `price_sol` for cost basis and PnL. */
+  market_price_sol: number | null;
+  /** {@link TokenTradeEntry.market_price_sol} in USD. */
+  market_price_usd: number | null;
   early_buyer_rank: number | null;
   slot: number | null;
   block_time: number;

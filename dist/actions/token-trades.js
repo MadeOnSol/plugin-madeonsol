@@ -46,7 +46,10 @@ export const tokenTradesAction = {
         }
         const lines = data.trades.slice(0, 15).map((t) => {
             const rank = t.early_buyer_rank != null ? `  #${t.early_buyer_rank} early` : "";
-            return `  ${t.traded_at.slice(0, 16).replace("T", " ")}  ${t.action.toUpperCase()}  ${t.sol_amount.toFixed(2)} SOL  ${t.wallet_address.slice(0, 6)}…${rank}`;
+            // Executed price, not the market price — this is what the wallet actually
+            // paid per token. null for dust / zero-SOL legs (a rugged sell).
+            const px = t.price_sol != null ? `  @ ${t.price_sol.toExponential(3)} SOL` : "";
+            return `  ${t.traded_at.slice(0, 16).replace("T", " ")}  ${t.action.toUpperCase()}  ${t.sol_amount.toFixed(2)} SOL${px}  ${t.wallet_address.slice(0, 6)}…${rank}`;
         });
         callback?.({
             text: `${mint.slice(0, 8)}… — ${data.trades.length} ${action ?? "trade"}(s)${data.has_more ? " (more available)" : ""}:\n${lines.join("\n")}`,
