@@ -412,6 +412,25 @@ export class MadeOnSolClient {
         const query = qs.toString() ? `?${qs.toString()}` : "";
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/depth${query}`);
     }
+    /**
+     * Live holder census + concentration — who holds NOW (`getTokenCapTable` = who
+     * bought first). Read live from the ledger at `confirmed`: every token account of
+     * the mint (mint-scoped `getProgramAccounts`), merged per owner. `concentration.holder_count`
+     * is EXACT (distinct non-zero owners minus excluded pools/curves/burns) and null ONLY
+     * when the provider refuses the census for a mega-cap (then `source.method` is
+     * `getTokenLargestAccounts`, `source.census_fallback_reason` is set and only the top-20
+     * view is served) — never estimated from trades. Each disclosed owner carries `labels[]`
+     * (deployer / kol / early_buyer / buyer / bundle / bot / dump_cluster; empty = unknown,
+     * NOT verified clean). Pools, bonding curves and burns are EXCLUDED from the circulating
+     * denominator and NAMED in `excluded[]` (`pool` + dex + pool_address | `bonding_curve` |
+     * `burn` | `program_account`). `amount_raw` / `supply_raw` / `circulating_raw` are raw u64
+     * STRINGS. Disclosure PRO 1–10, ULTRA 1–50, BUSINESS 1–100; the maths is tier-independent.
+     * Large established tokens may first return HTTP 503 `holder_scan_in_progress`
+     * (`retry_after_seconds: 20`) — the scan continues and is cached, the retry is instant. PRO+.
+     */
+    getTokenHolders(mint) {
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/holders`);
+    }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
         const qs = new URLSearchParams();

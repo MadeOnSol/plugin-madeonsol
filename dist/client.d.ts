@@ -226,6 +226,92 @@ export interface TokenDepth {
     unsupported_pools: TokenDepthUnsupportedPool[];
     note?: string;
 }
+/** One ranked holder inside `getTokenHolders` (owner wallet, token accounts merged). */
+export interface TokenHolderEntry {
+    rank: number;
+    owner: string;
+    token_accounts: string[];
+    /** Raw u64 as a decimal STRING — never a float. */
+    amount_raw: string;
+    amount: number | null;
+    pct_of_supply: number | null;
+    /** Share of supply minus pools / bonding curves / burns. */
+    pct_of_circulating: number | null;
+    /** From MadeOnSol wallet intelligence. Empty = unknown to us, NOT verified clean. */
+    labels: Array<"deployer" | "kol" | "early_buyer" | "buyer" | "bundle" | "bot" | "dump_cluster">;
+    kol_name: string | null;
+    early_buyer_rank: number | null;
+    bot_confidence: "none" | "low" | "medium" | "high" | null;
+    historical_win_rate: number | null;
+}
+/**
+ * An owner EXCLUDED from the circulating denominator, named where we can:
+ * `pool` (dex + pool_address set) | `bonding_curve` (pump.fun / LaunchLab) | `burn` |
+ * `program_account` (off-curve owner we could not attribute).
+ */
+export interface TokenHolderExcluded {
+    owner: string;
+    token_accounts: string[];
+    amount_raw: string;
+    pct_of_supply: number | null;
+    reason: "pool" | "bonding_curve" | "burn" | "program_account";
+    dex: string | null;
+    pool_address: string | null;
+}
+/**
+ * Live holder census + concentration — who holds NOW. Returned by `getTokenHolders`.
+ * `concentration.holder_count` is EXACT (census) and null ONLY when the provider
+ * refused the census (see `source.census_fallback_reason`) — never trade-estimated.
+ * Raw amounts are u64 STRINGS. Disclosure PRO 10 / ULTRA 50 / BUSINESS 100.
+ */
+export interface TokenHolders {
+    mint: string;
+    slot: number | null;
+    as_of: string;
+    holders: TokenHolderEntry[];
+    count: number;
+    disclosed: number;
+    excluded: TokenHolderExcluded[];
+    concentration: {
+        holder_count: number | null;
+        holder_count_source: "census" | null;
+        token_accounts_nonzero: number | null;
+        supply_raw: string | null;
+        circulating_raw: string | null;
+        decimals: number | null;
+        top1_share: number | null;
+        top10_share: number | null;
+        top20_share: number | null;
+        top50_share: number | null;
+        top100_share: number | null;
+        pool_and_program_pct: number | null;
+        pool_pct: number | null;
+        burned_pct: number | null;
+        program_pct: number | null;
+        deployer_pct: number | null;
+        kol_pct: number | null;
+        early_buyer_pct: number | null;
+        bundle_pct: number | null;
+        bot_pct: number | null;
+        dump_cluster_pct: number | null;
+        distinct_owners_in_top20: number;
+        ranked_owners_available: number;
+    };
+    deployer: {
+        wallet: string;
+        tier: string;
+        bonding_rate: number | null;
+    } | null;
+    source: {
+        method: "getProgramAccounts_census" | "getTokenLargestAccounts";
+        token_program: string | null;
+        rpc_cap: number;
+        commitment: string;
+        scan_ms: number | null;
+        census_fallback_reason: string | null;
+        note: string;
+    };
+}
 /** One daily reputation snapshot for a deployer. Returned inside `getDeployerHistory`. */
 export interface DeployerSnapshot {
     date: string;
@@ -790,6 +876,27 @@ export declare class MadeOnSolClient {
         sizes?: number[];
     }): Promise<{
         data?: TokenDepth | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Live holder census + concentration — who holds NOW (`getTokenCapTable` = who
+     * bought first). Read live from the ledger at `confirmed`: every token account of
+     * the mint (mint-scoped `getProgramAccounts`), merged per owner. `concentration.holder_count`
+     * is EXACT (distinct non-zero owners minus excluded pools/curves/burns) and null ONLY
+     * when the provider refuses the census for a mega-cap (then `source.method` is
+     * `getTokenLargestAccounts`, `source.census_fallback_reason` is set and only the top-20
+     * view is served) — never estimated from trades. Each disclosed owner carries `labels[]`
+     * (deployer / kol / early_buyer / buyer / bundle / bot / dump_cluster; empty = unknown,
+     * NOT verified clean). Pools, bonding curves and burns are EXCLUDED from the circulating
+     * denominator and NAMED in `excluded[]` (`pool` + dex + pool_address | `bonding_curve` |
+     * `burn` | `program_account`). `amount_raw` / `supply_raw` / `circulating_raw` are raw u64
+     * STRINGS. Disclosure PRO 1–10, ULTRA 1–50, BUSINESS 1–100; the maths is tier-independent.
+     * Large established tokens may first return HTTP 503 `holder_scan_in_progress`
+     * (`retry_after_seconds: 20`) — the scan continues and is cached, the retry is instant. PRO+.
+     */
+    getTokenHolders(mint: string): Promise<{
+        data?: TokenHolders | undefined;
         error?: string;
         status: number;
     }>;
