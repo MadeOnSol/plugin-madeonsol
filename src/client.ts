@@ -340,6 +340,354 @@ export interface TokenHolders {
   };
 }
 
+// ── Token locks & vesting (GET /tokens/{mint}/locks, /tokens/locks, /tokens/unlocks — PRO+, keyed API only) ──
+
+export type TokenLockProgram = "streamflow" | "jupiter_lock" | "bonfida_vesting";
+export type TokenLockKind = "lock" | "vesting";
+export type TokenLockStatus = "active" | "completed" | "cancelled" | "closed";
+export type TokenUnlockEventKind = "cliff" | "period" | "final" | "tranche";
+
+/** The next unlock event of a contract (or the nearest one across a mint's contracts). */
+export interface TokenLockNextUnlock {
+  at: string;
+  kind: TokenUnlockEventKind;
+  /** Base units as a digit STRING. */
+  amount_raw: string;
+  amount: number | null;
+  amount_usd: number | null;
+  /** Only on the summary-level `next_unlock`. */
+  lock_account?: string;
+}
+
+/**
+ * One on-chain lock / vesting contract with a live-derived view (computed at request time).
+ * `*_raw` = base units as digit STRINGS — never coerce to a float; ui / usd / pct are null when
+ * decimals or price are unknown. LP locks are NOT included in this feature.
+ */
+export interface TokenLock {
+  /** The contract account (Streamflow stream / Jupiter VestingEscrow / Bonfida vesting account). */
+  lock_account: string;
+  program: TokenLockProgram;
+  /** lock = whole amount at one date; vesting = cliff and/or periodic release. */
+  kind: TokenLockKind;
+  /** Derived at request time. */
+  status: TokenLockStatus;
+  mint: string;
+  /** Creator / locker (Bonfida has none on-chain). */
+  sender: string | null;
+  recipient: string | null;
+  name: string | null;
+  amount_raw: string;
+  amount: number | null;
+  amount_usd: number | null;
+  amount_pct_of_supply: number | null;
+  /** Still locked right now (amount − unlocked-so-far); 0 unless active. */
+  locked_raw: string;
+  locked: number | null;
+  locked_usd: number | null;
+  locked_pct_of_supply: number | null;
+  unlocked_raw: string;
+  unlocked: number | null;
+  /** Claimed so far. */
+  withdrawn_raw: string;
+  withdrawn: number | null;
+  /** Unlocked but not yet withdrawn. */
+  claimable_raw: string;
+  claimable: number | null;
+  start_at: string | null;
+  cliff_at: string | null;
+  /** Fully unlocked at; null = perpetual / no schedule. */
+  end_at: string | null;
+  period_seconds: number | null;
+  /** period < 1h (per-second stream). */
+  continuous: boolean;
+  amount_per_period_raw: string | null;
+  amount_per_period: number | null;
+  cliff_amount_raw: string | null;
+  cliff_amount: number | null;
+  perpetual: boolean;
+  next_unlock: TokenLockNextUnlock | null;
+  /** The locker can cancel — funds are locked against the recipient, not the locker. */
+  cancelable_by_sender: boolean | null;
+  cancelable_by_recipient: boolean | null;
+  transferable: boolean | null;
+  can_topup: boolean | null;
+  cancelled_at: string | null;
+  created_at: string | null;
+  /** Backfilled row with no on-chain creation time (Jupiter Lock). */
+  created_at_estimated: boolean;
+  tx_signature: string | null;
+}
+
+/** Token facts joined onto lock rows / unlock events. */
+export interface TokenLockTokenInfo {
+  symbol: string | null;
+  name: string | null;
+  decimals: number | null;
+  price_usd: number | null;
+  market_cap_usd: number | null;
+}
+
+/** Response of `getTokenLocks(mint)` — every lock/vesting contract on ONE mint + summary. */
+export interface TokenLocks {
+  mint: string;
+  token: TokenLockTokenInfo & { supply: number | null; facts_resolved: boolean };
+  summary: {
+    /** Exact count of contracts on the mint. */
+    lock_count: number;
+    /** false when the mint holds more than 5000 contracts — totals then cover the newest 5000 (rows_considered). */
+    complete: boolean;
+    rows_considered: number;
+    active_count: number;
+    by_program: Record<string, number>;
+    by_kind: Record<string, number>;
+    distinct_lockers: number;
+    locked_raw: string;
+    locked: number | null;
+    locked_usd: number | null;
+    locked_pct_of_supply: number | null;
+    deposited_raw: string;
+    deposited: number | null;
+    deposited_usd: number | null;
+    unlocking_7d_raw: string;
+    unlocking_7d: number | null;
+    unlocking_7d_usd: number | null;
+    unlocking_7d_pct_of_supply: number | null;
+    unlocking_30d_raw: string;
+    unlocking_30d: number | null;
+    unlocking_30d_usd: number | null;
+    unlocking_30d_pct_of_supply: number | null;
+    next_unlock: TokenLockNextUnlock | null;
+    active_cancelable_by_sender: number;
+  };
+  locks: TokenLock[];
+  meta?: Record<string, unknown>;
+}
+
+/** Response of `getTokenLocksFeed(params)` — newest lock/vesting contracts across all mints. */
+export interface TokenLocksFeed {
+  locks: Array<TokenLock & { token: TokenLockTokenInfo }>;
+  pagination: { limit: number; count: number; has_more: boolean; next_since: string | null; next_before: string | null };
+  /** WebSocket pointer for the `token:locks` channel (event `token:lock`). */
+  stream?: { channel: string; url?: string; [k: string]: unknown };
+  meta?: Record<string, unknown>;
+}
+
+/** One upcoming unlock event inside `getTokenUnlocks(params)`. */
+export interface TokenUnlockEvent {
+  unlock_at: string;
+  in_seconds: number;
+  event: TokenUnlockEventKind;
+  amount_raw: string;
+  amount: number | null;
+  amount_usd: number | null;
+  amount_pct_of_supply: number | null;
+  /** This contract's total release over the whole window. */
+  window_amount_raw: string;
+  window_amount: number | null;
+  window_amount_usd: number | null;
+  window_amount_pct_of_supply: number | null;
+  mint: string;
+  token: TokenLockTokenInfo;
+  /** The contract this event belongs to (subset of the `TokenLock` row). */
+  lock: Partial<TokenLock> & { lock_account: string; program: TokenLockProgram };
+}
+
+/** Response of `getTokenUnlocks(params)`. */
+export interface TokenUnlocks {
+  window: { within: string; from: string; to: string };
+  unlocks: TokenUnlockEvent[];
+  pagination: { limit: number; count: number; total_in_window: number; has_more: boolean };
+  meta?: Record<string, unknown>;
+}
+
+// ── pump.fun creator-fee sharing / claims (GET /tokens/{mint}/fee-shares, /tokens/fee-claims — PRO+, keyed API only) ──
+
+/** A platform identity (SocialFeePda) that fees are earmarked for. platform 2 = X; user_id is the platform-native numeric id, not the handle. */
+export interface FeeShareSocial {
+  platform: number;
+  /** "x" for platform 2; `platform_<n>` until observed. */
+  platform_label: string | null;
+  user_id: string;
+  lifetime_claimed_raw: string;
+  lifetime_claimed: number | null;
+  lifetime_claimed_usd: number | null;
+  last_claimed_at: string | null;
+}
+
+/** One shareholder / recipient of a pump.fun SharingConfig. */
+export interface FeeShareholder {
+  address: string;
+  share_bps: number | null;
+  share_pct: number | null;
+  /** The config admin (normally the coin creator). */
+  is_admin: boolean;
+  /** Address is a pump_fees SocialFeePda — fees earmarked for a platform identity. */
+  is_social_pda: boolean;
+  social: FeeShareSocial | null;
+  /** Quote base units (SOL lamports unless a stable-quoted coin) as a digit STRING. */
+  received_raw: string;
+  received: number | null;
+  received_usd: number | null;
+  payout_count: number;
+  last_payout_at: string | null;
+}
+
+/** Response of `getTokenFeeShares(mint)`. Event history (distributions / history) starts 2026-08-17. */
+export interface TokenFeeShares {
+  mint: string;
+  /** null only when the live read failed on every RPC endpoint (see `config_error`). */
+  config: {
+    sharing_config: string;
+    admin: string | null;
+    admin_revoked: boolean | null;
+    status: string | null;
+    version: number | null;
+    /** 100% to the admin — no redirect. A real answer, not "no data". */
+    is_default: boolean | null;
+    redirected_bps: number;
+    redirected_pct: number;
+    social_bps: number;
+    social_pct: number;
+    shareholders: FeeShareholder[];
+    /** stream = our table (only NON-default configs are stored); chain = live PDA read. */
+    source: "stream" | "chain";
+    updated_at: string | null;
+  } | null;
+  config_pda: string;
+  config_error: string | null;
+  quote: { symbol: string; decimals: number; sol_usd: number | null };
+  distributions: {
+    count: number;
+    total_raw: string;
+    total: number | null;
+    total_usd: number | null;
+    last_at: string | null;
+    recipients: FeeShareholder[];
+    past_recipients: FeeShareholder[];
+    payouts_considered: number;
+    payouts_truncated: boolean;
+  };
+  /** Config changes + creator transfers, newest first. */
+  history: Array<Record<string, unknown>>;
+  recent_distributions: Array<{
+    at: string;
+    tx_signature: string;
+    amount_raw: string;
+    amount: number | null;
+    amount_usd: number | null;
+    shareholders: Array<Record<string, unknown>>;
+    actor: string | null;
+  }>;
+  meta?: Record<string, unknown>;
+}
+
+export type TokenFeeEventType =
+  | "shares_created"
+  | "shares_updated"
+  | "shares_reset"
+  | "distribution"
+  | "social_pda_created"
+  | "social_claim"
+  | "creator_transferred"
+  | "creator_claim";
+
+/** One pump.fun fee event inside `getTokenFeeClaims(params)`. */
+export interface TokenFeeEvent {
+  id: number;
+  type: TokenFeeEventType;
+  at: string;
+  tx_signature: string;
+  slot: number | null;
+  /** NULL for social claims and creator vault claims (per identity / per creator). */
+  mint: string | null;
+  admin: string | null;
+  /** Transaction signer. */
+  actor: string | null;
+  recipient: string | null;
+  /** Quote base units (SOL lamports unless a stable-quoted coin) as a digit STRING. */
+  amount_raw: string | null;
+  amount: number | null;
+  amount_usd: number | null;
+  quote: string;
+  social: { platform: number; platform_label: string | null; user_id: string; pda: string | null } | null;
+  shareholders: Array<{ address: string; share_bps: number }> | null;
+  /** distribution only: pro-rata amount per shareholder. */
+  payouts: Array<{ address: string; share_bps: number; amount_raw: string; amount: number | null; amount_usd: number | null }> | null;
+  /** Full decoded Anchor event. */
+  payload: Record<string, unknown> | null;
+}
+
+/** Response of `getTokenFeeClaims(params)`. History starts 2026-08-17. */
+export interface TokenFeeClaims {
+  events: TokenFeeEvent[];
+  pagination: { limit: number; count: number; has_more: boolean; next_since: string | null; next_before: string | null };
+  /** WebSocket pointer for the `token:fee_claims` channel (event `token:fee_claim`). */
+  stream?: { channel: string; url?: string; [k: string]: unknown };
+  meta?: Record<string, unknown>;
+}
+
+export interface TokenLocksParams {
+  status?: TokenLockStatus;
+  program?: TokenLockProgram;
+  /** 1–500, default 200. */
+  limit?: number;
+}
+
+export interface TokenLocksFeedParams {
+  /** ISO 8601 — only contracts created after this instant (pagination.next_since). */
+  since?: string;
+  /** ISO 8601 — page back (pagination.next_before). */
+  before?: string;
+  mint?: string;
+  sender?: string;
+  recipient?: string;
+  program?: TokenLockProgram;
+  kind?: TokenLockKind;
+  status?: TokenLockStatus;
+  /** Deposited amount ≥ (needs a known price; post-filter). */
+  min_usd?: number;
+  /** 0–100 (post-filter). */
+  min_pct_of_supply?: number;
+  /** "1" to include backfilled Jupiter Lock rows (estimated created_at); excluded by default. */
+  include_estimated?: "1" | "0" | "true" | "false" | boolean;
+  /** 1–100, default 50. */
+  limit?: number;
+}
+
+export interface TokenUnlocksParams {
+  within?: "1h" | "6h" | "24h" | "3d" | "7d" | "14d" | "30d" | "90d";
+  mint?: string;
+  program?: TokenLockProgram;
+  kind?: TokenLockKind;
+  /** Next-event amount ≥ (needs a known price). */
+  min_usd?: number;
+  min_pct_of_supply?: number;
+  sort?: "soonest" | "largest_usd" | "largest_pct";
+  /** 1–200, default 50. */
+  limit?: number;
+}
+
+export interface TokenFeeClaimsParams {
+  /** Comma list of event types (default: all except creator_claim). */
+  type?: string;
+  mint?: string;
+  /** Payout / claim recipient wallet, or new creator. */
+  recipient?: string;
+  /** Transaction signer. */
+  actor?: string;
+  /** Raw platform id (2 = X). */
+  social_platform?: number;
+  /** Platform-native numeric user id. */
+  social_user_id?: string;
+  /** Amount floor in SOL. */
+  min_sol?: number;
+  since?: string;
+  before?: string;
+  /** 1–100, default 50. */
+  limit?: number;
+}
+
 /** One daily reputation snapshot for a deployer. Returned inside `getDeployerHistory`. */
 export interface DeployerSnapshot {
   date: string;
@@ -916,6 +1264,93 @@ export class MadeOnSolClient {
    */
   getTokenHolders(mint: string) {
     return this.restRequest<TokenHolders>("GET", `/tokens/${encodeURIComponent(mint)}/holders`);
+  }
+
+  /**
+   * Token locks & vesting on ONE mint — every Streamflow / Jupiter Lock / Bonfida vesting
+   * contract decoded from the locker programs' account state, with the schedule, the terms
+   * (`cancelable_by_sender` = the locker can pull it — funds are locked against the recipient,
+   * not the locker) and a LIVE-derived view (`locked_*`, `claimable_*`, `next_unlock`, `status`),
+   * plus a `summary` (locked / deposited totals, `unlocking_7d_*` / `unlocking_30d_*`, nearest
+   * `next_unlock`, `active_cancelable_by_sender`). Answers "did the team lock, how much, until
+   * when, and can they pull it". Base-unit amounts are digit STRINGS; ui/usd/pct null when
+   * decimals or price are unknown (`token.facts_resolved`). `status` / `program` filter the list
+   * only — the summary always covers all rows. **LP locks are NOT included.** PRO+ (keyed API only).
+   */
+  getTokenLocks(mint: string, params?: TokenLocksParams) {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.program) qs.set("program", params.program);
+    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenLocks>("GET", `/tokens/${encodeURIComponent(mint)}/locks${query}`);
+  }
+
+  /**
+   * Cross-token feed of NEW lock / vesting contracts, newest first (same row shape as
+   * `getTokenLocks` + `token {symbol, price_usd, market_cap_usd}`). Poll with `since`
+   * (cursor `pagination.next_since`), page back with `before`, or subscribe to WS channel
+   * `token:locks` (event `token:lock`) for a push the moment the contract lands. `min_usd` /
+   * `min_pct_of_supply` / `status` post-filter (×4 over-fetch, pages may be short). Backfilled
+   * Jupiter Lock rows (`created_at_estimated`) are excluded unless `include_estimated: "1"`.
+   * LP locks NOT included. PRO+ (keyed API only).
+   */
+  getTokenLocksFeed(params?: TokenLocksFeedParams) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenLocksFeed>("GET", `/tokens/locks${query}`);
+  }
+
+  /**
+   * Upcoming unlock EVENTS across all active lock / vesting contracts inside `within`
+   * (1h | 6h | 24h | 3d | 7d | 14d | 30d | 90d, default 7d) — one entry per contract = its next
+   * cliff / period / final / tranche event, with `amount_*` for that event and `window_amount_*`
+   * (total release over the whole window). Continuous per-second streams contribute only their
+   * cliff / final events. `sort` soonest (default) | largest_usd | largest_pct. Base-unit amounts
+   * are digit STRINGS; usd null when price unknown (or phantom, implied MC > $100B). LP locks NOT
+   * included. PRO+ (keyed API only).
+   */
+  getTokenUnlocks(params?: TokenUnlocksParams) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenUnlocks>("GET", `/tokens/unlocks${query}`);
+  }
+
+  /**
+   * pump.fun creator-fee sharing on ONE coin — the on-chain SharingConfig (PDA
+   * ["sharing-config", mint] of the pump_fees program): admin, status, `shareholders[]` with
+   * `share_bps`, `is_admin`, `is_social_pda` (fees earmarked for a platform identity — `social.platform`
+   * 2 = X, `user_id` = the platform-native numeric id, not the handle) and per-recipient received
+   * totals, `redirected_bps` (share going to non-admin addresses), `social_bps`, `is_default: true`
+   * = 100% to the creator (a real answer). `source` = "stream" (our table — only non-default
+   * configs are stored) or "chain" (live PDA read; `config_error` set if every endpoint failed).
+   * Plus `distributions` rollup (recipients, past_recipients), `history[]` (config created /
+   * updated / reset, creator transferred) and `recent_distributions[]`. Amounts are quote base
+   * units (SOL lamports unless a stable-quoted coin) as digit STRINGS. **Event history starts
+   * 2026-08-17.** PRO+ (keyed API only).
+   */
+  getTokenFeeShares(mint: string) {
+    return this.restRequest<TokenFeeShares>("GET", `/tokens/${encodeURIComponent(mint)}/fee-shares`);
+  }
+
+  /**
+   * pump.fun fee-event feed, newest first, across all coins: `distribution` (creator fees paid
+   * pro-rata to the SharingConfig shareholders, with `payouts[]` per address), `social_claim`
+   * (fees for a platform identity — platform 2 = X — claimed to a recipient wallet; `mint` null),
+   * `shares_created` / `shares_updated` / `shares_reset`, `creator_transferred`, and
+   * `creator_claim` (plain creator vault claim, per creator, no mint — EXCLUDED unless requested
+   * via `type`). Default 100%-to-creator configs and zero-amount distributions are not stored.
+   * Poll with `since` (cursor `pagination.next_since`) or subscribe to WS channel
+   * `token:fee_claims` (event `token:fee_claim`). Amounts are quote base units as digit STRINGS.
+   * **History starts 2026-08-17.** PRO+ (keyed API only).
+   */
+  getTokenFeeClaims(params?: TokenFeeClaimsParams) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return this.restRequest<TokenFeeClaims>("GET", `/tokens/fee-claims${query}`);
   }
 
   /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */

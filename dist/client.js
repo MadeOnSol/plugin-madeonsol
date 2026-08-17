@@ -431,6 +431,97 @@ export class MadeOnSolClient {
     getTokenHolders(mint) {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/holders`);
     }
+    /**
+     * Token locks & vesting on ONE mint — every Streamflow / Jupiter Lock / Bonfida vesting
+     * contract decoded from the locker programs' account state, with the schedule, the terms
+     * (`cancelable_by_sender` = the locker can pull it — funds are locked against the recipient,
+     * not the locker) and a LIVE-derived view (`locked_*`, `claimable_*`, `next_unlock`, `status`),
+     * plus a `summary` (locked / deposited totals, `unlocking_7d_*` / `unlocking_30d_*`, nearest
+     * `next_unlock`, `active_cancelable_by_sender`). Answers "did the team lock, how much, until
+     * when, and can they pull it". Base-unit amounts are digit STRINGS; ui/usd/pct null when
+     * decimals or price are unknown (`token.facts_resolved`). `status` / `program` filter the list
+     * only — the summary always covers all rows. **LP locks are NOT included.** PRO+ (keyed API only).
+     */
+    getTokenLocks(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.status)
+            qs.set("status", params.status);
+        if (params?.program)
+            qs.set("program", params.program);
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/locks${query}`);
+    }
+    /**
+     * Cross-token feed of NEW lock / vesting contracts, newest first (same row shape as
+     * `getTokenLocks` + `token {symbol, price_usd, market_cap_usd}`). Poll with `since`
+     * (cursor `pagination.next_since`), page back with `before`, or subscribe to WS channel
+     * `token:locks` (event `token:lock`) for a push the moment the contract lands. `min_usd` /
+     * `min_pct_of_supply` / `status` post-filter (×4 over-fetch, pages may be short). Backfilled
+     * Jupiter Lock rows (`created_at_estimated`) are excluded unless `include_estimated: "1"`.
+     * LP locks NOT included. PRO+ (keyed API only).
+     */
+    getTokenLocksFeed(params) {
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(params ?? {}))
+            if (v !== undefined && v !== null)
+                qs.set(k, String(v));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/locks${query}`);
+    }
+    /**
+     * Upcoming unlock EVENTS across all active lock / vesting contracts inside `within`
+     * (1h | 6h | 24h | 3d | 7d | 14d | 30d | 90d, default 7d) — one entry per contract = its next
+     * cliff / period / final / tranche event, with `amount_*` for that event and `window_amount_*`
+     * (total release over the whole window). Continuous per-second streams contribute only their
+     * cliff / final events. `sort` soonest (default) | largest_usd | largest_pct. Base-unit amounts
+     * are digit STRINGS; usd null when price unknown (or phantom, implied MC > $100B). LP locks NOT
+     * included. PRO+ (keyed API only).
+     */
+    getTokenUnlocks(params) {
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(params ?? {}))
+            if (v !== undefined && v !== null)
+                qs.set(k, String(v));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/unlocks${query}`);
+    }
+    /**
+     * pump.fun creator-fee sharing on ONE coin — the on-chain SharingConfig (PDA
+     * ["sharing-config", mint] of the pump_fees program): admin, status, `shareholders[]` with
+     * `share_bps`, `is_admin`, `is_social_pda` (fees earmarked for a platform identity — `social.platform`
+     * 2 = X, `user_id` = the platform-native numeric id, not the handle) and per-recipient received
+     * totals, `redirected_bps` (share going to non-admin addresses), `social_bps`, `is_default: true`
+     * = 100% to the creator (a real answer). `source` = "stream" (our table — only non-default
+     * configs are stored) or "chain" (live PDA read; `config_error` set if every endpoint failed).
+     * Plus `distributions` rollup (recipients, past_recipients), `history[]` (config created /
+     * updated / reset, creator transferred) and `recent_distributions[]`. Amounts are quote base
+     * units (SOL lamports unless a stable-quoted coin) as digit STRINGS. **Event history starts
+     * 2026-08-17.** PRO+ (keyed API only).
+     */
+    getTokenFeeShares(mint) {
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/fee-shares`);
+    }
+    /**
+     * pump.fun fee-event feed, newest first, across all coins: `distribution` (creator fees paid
+     * pro-rata to the SharingConfig shareholders, with `payouts[]` per address), `social_claim`
+     * (fees for a platform identity — platform 2 = X — claimed to a recipient wallet; `mint` null),
+     * `shares_created` / `shares_updated` / `shares_reset`, `creator_transferred`, and
+     * `creator_claim` (plain creator vault claim, per creator, no mint — EXCLUDED unless requested
+     * via `type`). Default 100%-to-creator configs and zero-amount distributions are not stored.
+     * Poll with `since` (cursor `pagination.next_since`) or subscribe to WS channel
+     * `token:fee_claims` (event `token:fee_claim`). Amounts are quote base units as digit STRINGS.
+     * **History starts 2026-08-17.** PRO+ (keyed API only).
+     */
+    getTokenFeeClaims(params) {
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(params ?? {}))
+            if (v !== undefined && v !== null)
+                qs.set(k, String(v));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/fee-claims${query}`);
+    }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
         const qs = new URLSearchParams();
