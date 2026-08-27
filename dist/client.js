@@ -222,8 +222,17 @@ export class MadeOnSolClient {
     testWebhook(webhookId) {
         return this.restRequest("POST", "/webhooks/test", { webhook_id: webhookId });
     }
-    getStreamToken() {
-        return this.restRequest("POST", "/stream/token");
+    /**
+     * Issue your WebSocket streaming token. Stream tokens never expire (since
+     * 2026-08-27): every call returns the same token until your subscription
+     * lapses or you pass `{ rotate: true }`, which replaces it (the previous value
+     * keeps working for 60 s). `expires_at` / `next_refresh_at` are always `null`;
+     * the response also carries `rotated` (boolean) and `lifetime` (string). A
+     * `4001` close means "mint again", never a timer. Authenticate the handshake
+     * with `Authorization: Bearer <token>`.
+     */
+    getStreamToken(opts) {
+        return this.restRequest("POST", "/stream/token", opts?.rotate ? { rotate: true } : undefined);
     }
     // ── Live WebSocket sessions (PRO/ULTRA) ──
     /** List the caller's live WebSocket streaming sessions across ws-streaming + dex-stream. PRO+. */
