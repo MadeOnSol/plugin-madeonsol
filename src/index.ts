@@ -17,6 +17,7 @@ import { tokenLocksFeedAction } from "./actions/token-locks-feed.js";
 import { tokenUnlocksAction } from "./actions/token-unlocks.js";
 import { tokenFeeSharesAction } from "./actions/token-fee-shares.js";
 import { tokenFeeClaimsAction } from "./actions/token-fee-claims.js";
+import { tokenSurgesAction } from "./actions/token-surges.js";
 import { deployerHistoryAction } from "./actions/deployer-history.js";
 import { deployerHunterAction } from "./actions/deployer-hunter.js";
 import { tokenCandlesAction } from "./actions/token-candles.js";
@@ -55,7 +56,8 @@ export const madeOnSolPlugin: Plugin = {
     tokenUnlocksAction,
     tokenFeeSharesAction,
     tokenFeeClaimsAction,
-    deployerHistoryAction,
+
+    tokenSurgesAction,    deployerHistoryAction,
     deployerHunterAction,
     tokenCandlesAction,
     tokenFlowAction,
@@ -121,6 +123,6 @@ export default madeOnSolPlugin;
 export { MadeOnSolClient } from "./client.js";
 export { kolFeedAction, kolCoordinationAction, kolLeaderboardAction, deployerAlertsAction };
 export { walletTrackerWatchlistAction, walletTrackerTradesAction };
-export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenPoolsAction, tokenDepthAction, tokenHoldersAction, tokenLocksAction, tokenLocksFeedAction, tokenUnlocksAction, tokenFeeSharesAction, tokenFeeClaimsAction, deployerHistoryAction, deployerHunterAction, tokenCandlesAction, tokenFlowAction, tokenTradesAction };
+export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenPoolsAction, tokenDepthAction, tokenHoldersAction, tokenLocksAction, tokenLocksFeedAction, tokenUnlocksAction, tokenFeeSharesAction, tokenFeeClaimsAction, tokenSurgesAction, deployerHistoryAction, deployerHunterAction, tokenCandlesAction, tokenFlowAction, tokenTradesAction };
 export { meAction, tokensListAction, almostBondedAction };
 export { walletStatsAction, walletPnlAction, walletPositionsAction, walletHoldingsAction, walletTradesAction };

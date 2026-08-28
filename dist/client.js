@@ -531,6 +531,31 @@ export class MadeOnSolClient {
         const query = qs.toString() ? `?${qs.toString()}` : "";
         return this.restRequest("GET", `/tokens/fee-claims${query}`);
     }
+    /**
+     * Token surges & revivals — token momentum fires, newest first (`GET /tokens/surges`).
+     * `kind: "surge"` = a token < 30 min old running hard vs its LAUNCH MC: `tier` early (≤10 min,
+     * ≥$12k, ≥3×) | strong (≤30 min, ≥$30k, ≥6× and ≥2× the 3-min low) | breakout (≤2 min, ≥$45k,
+     * ≥8×), each once per mint, SUSTAINED ≥10 s (a one-tick bundle mark is a spike, not a surge).
+     * `kind: "revival"` = no 1-minute trade candle for ≥24 h, then confirmed by the tape (≥5 buys,
+     * ≥$500 buy volume, MC ≥1.5× the pre-dormancy close) — never by a price mark; `tier` null. Both
+     * need liquidity ≥$1.5k and ≥2% of MC, and the MC gained must be paid for by buy volume. Each
+     * row: `tape` (unique_buyers null outside trade coverage), `kol`, `early_buyers` (bundled / sold
+     * / sniper), `deployer`, `risk_flags[]` (empty = no flag raised, not verified clean) and
+     * `outcome` (+1 h MC / peak / low) once ≥65 min old; `stats: "1"` adds per-(kind, tier)
+     * hit-rates over `days`. Poll with `since` (cursor `pagination.next_since`), page back with
+     * `before`, or subscribe to WS channel `token:surges` (events `token:surge` / `token:revival`).
+     * Retention 60 d. PRO+ (keyed API only).
+     */
+    getTokenSurges(params) {
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(params ?? {})) {
+            if (v === undefined || v === null)
+                continue;
+            qs.set(k, typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+        }
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/surges${query}`);
+    }
     /** Historical OHLCV candles (1m/5m/15m/1h/4h/1d) aggregated from the trade firehose. PRO=OHLCV 30d; ULTRA=+net flow, liquidity delta, full history. PRO+. */
     getTokenCandles(mint, params) {
         const qs = new URLSearchParams();

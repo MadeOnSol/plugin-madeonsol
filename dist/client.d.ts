@@ -685,6 +685,181 @@ export interface TokenFeeClaimsParams {
     /** 1–100, default 50. */
     limit?: number;
 }
+export type TokenSurgeKind = "surge" | "revival";
+export type TokenSurgeTier = "early" | "strong" | "breakout";
+export type TokenSurgeRiskFlag = "bundled_launch" | "few_buyers" | "wash_pattern" | "thin_liquidity" | "cold_deployer" | "sniper_heavy" | "early_buyers_exiting" | "sell_pressure" | "no_tape_trades" | "no_prior_price" | "mint_authority_active" | "transfer_fee";
+/**
+ * One token momentum fire — the `token:surge` / `token:revival` WS + webhook payload and a
+ * `getTokenSurges` row minus `outcome`. Both kinds share one shape: `tier`, `baseline_*`,
+ * `mc_multiple`, `mc_change_3m_pct` are null on revivals; `dormant_hours`, `prev_mc_usd`,
+ * `mc_vs_prev_multiple` are null on surges.
+ */
+export interface TokenSurgeEvent {
+    id: number | null;
+    kind: TokenSurgeKind;
+    tier: TokenSurgeTier | null;
+    mint: string;
+    symbol: string | null;
+    name: string | null;
+    /** Venue at birth (pumpfun / launchlab / bags …). */
+    launchpad: string | null;
+    /** Venue at fire time. */
+    primary_dex: string | null;
+    fired_at: string;
+    birth_at: string | null;
+    birth_source: "sniper" | "deployer" | "first_seen" | null;
+    age_seconds: number | null;
+    market_cap_usd: number;
+    liquidity_usd: number | null;
+    liquidity_to_mc_ratio: number | null;
+    price_usd: number | null;
+    /** Surge only: launch MC; `late` = engine saw the token late, multiple not applied. */
+    baseline_mc_usd: number | null;
+    baseline_source: "launch" | "late" | null;
+    mc_multiple: number | null;
+    mc_change_3m_pct: number | null;
+    /** Revival only. */
+    dormant_hours: number | null;
+    prev_mc_usd: number | null;
+    mc_vs_prev_multiple: number | null;
+    peak_mc_usd: number | null;
+    pct_of_peak: number | null;
+    bonding_progress_pct: number | null;
+    is_bonded: boolean | null;
+    /** Burst tape since birth / revival. Counts are null when no tape covers the window yet (`available:false`). */
+    tape: {
+        since: string | null;
+        available: boolean;
+        source: "candles" | "wallet_trades" | null;
+        buys: number | null;
+        sells: number | null;
+        trades: number | null;
+        buy_volume_usd: number | null;
+        sell_volume_usd: number | null;
+        volume_usd: number | null;
+        mev_volume_usd: number | null;
+        buy_sol: number | null;
+        sell_sol: number | null;
+        /** Only where the mint is in trade coverage (`wallet_data_available`) — never an inferred zero. */
+        unique_buyers: number | null;
+        unique_wallets: number | null;
+        trades_per_wallet: number | null;
+        wallet_data_available: boolean;
+    };
+    kol: {
+        buyers: number;
+        buys: number;
+        sells: number;
+        names: string[];
+    };
+    early_buyers: {
+        count: number;
+        bundled: number;
+        cohort_sol: number | null;
+        sold: number;
+        sniper_wallets: number;
+    };
+    deployer: {
+        wallet: string | null;
+        tier: string;
+        bonding_rate: number | null;
+        total_bonded: number | null;
+        total_deployed: number | null;
+        runner_rate: number | null;
+        labeled_tokens: number | null;
+        recent: string | null;
+    } | null;
+    deployer_wallet: string | null;
+    deployer_tier: string | null;
+    mint_authority_revoked: boolean | null;
+    freeze_authority_revoked: boolean | null;
+    is_token_2022: boolean | null;
+    /** Empty = no flag raised, NOT verified clean. */
+    risk_flags: TokenSurgeRiskFlag[];
+    detail_url: string;
+    enrichment_available?: boolean;
+}
+/** +1 h outcome on `getTokenSurges` rows ≥ 65 min old. `priced_after_1h:false` = no candle in the hour, NOT zero. */
+export interface TokenSurgeOutcome {
+    computed_at: string;
+    mc_usd_1h_after: number | null;
+    peak_mc_usd_1h_after: number | null;
+    low_mc_usd_1h_after: number | null;
+    mc_1h_multiple: number | null;
+    peak_1h_multiple: number | null;
+    priced_after_1h: boolean;
+}
+/** Per-(kind, tier) hit-rate row inside `getTokenSurges({ stats: "1" })`. */
+export interface TokenSurgeStatsRow {
+    kind: TokenSurgeKind;
+    tier: TokenSurgeTier | null;
+    fires: number;
+    with_outcome: number;
+    up_1h: number;
+    up_1h_pct: number | null;
+    median_peak_multiple: number | null;
+    p75_peak_multiple: number | null;
+    median_mc_1h_multiple: number | null;
+    doubled_1h: number;
+    doubled_1h_pct: number | null;
+}
+/** Response of `getTokenSurges(params)` — token momentum fires, newest first. */
+export interface TokenSurges {
+    events: Array<TokenSurgeEvent & {
+        id: number;
+        outcome: TokenSurgeOutcome | null;
+    }>;
+    pagination: {
+        limit: number;
+        count: number;
+        has_more: boolean;
+        next_since: string | null;
+        next_before: string | null;
+    };
+    filters: Record<string, unknown>;
+    /** Present only when `stats` was requested. */
+    stats?: {
+        days: number;
+        note: string;
+        rows: TokenSurgeStatsRow[];
+    };
+    /** WebSocket pointer for the `token:surges` channel (events `token:surge` / `token:revival`). */
+    stream?: {
+        channel: string;
+        url?: string;
+        [k: string]: unknown;
+    };
+    /** Live engine thresholds (surge / revival / shared / risk_flags / tiers). */
+    definitions: Record<string, unknown>;
+    note: string;
+    meta?: Record<string, unknown>;
+}
+export interface TokenSurgesParams {
+    kind?: TokenSurgeKind;
+    /** Surge only — 400 with `kind: "revival"`. */
+    tier?: TokenSurgeTier;
+    mint?: string;
+    /** ISO 8601 — only fires after this instant (pagination.next_since). */
+    since?: string;
+    /** ISO 8601 — page back (pagination.next_before). */
+    before?: string;
+    min_mc_usd?: number;
+    max_mc_usd?: number;
+    /** Tape buys at fire time ≥. */
+    min_buys?: number;
+    launchpad?: string;
+    deployer_tier?: "elite" | "good" | "moderate" | "rising" | "cold" | "unranked";
+    /** Comma list — rows carrying ANY of these flags are dropped. */
+    exclude_flags?: string;
+    /** "1" = only rows with no risk flags at all. */
+    only_clean?: "1" | "0" | "true" | "false" | boolean;
+    /** "1" = include per-(kind, tier) hit-rates over `days`. */
+    stats?: "1" | "0" | "true" | "false" | boolean;
+    /** 1–30, default 7. */
+    days?: number;
+    /** 1–200, default 50. */
+    limit?: number;
+}
 /** One daily reputation snapshot for a deployer. Returned inside `getDeployerHistory`. */
 export interface DeployerSnapshot {
     date: string;
@@ -1359,6 +1534,26 @@ export declare class MadeOnSolClient {
      */
     getTokenFeeClaims(params?: TokenFeeClaimsParams): Promise<{
         data?: TokenFeeClaims | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Token surges & revivals — token momentum fires, newest first (`GET /tokens/surges`).
+     * `kind: "surge"` = a token < 30 min old running hard vs its LAUNCH MC: `tier` early (≤10 min,
+     * ≥$12k, ≥3×) | strong (≤30 min, ≥$30k, ≥6× and ≥2× the 3-min low) | breakout (≤2 min, ≥$45k,
+     * ≥8×), each once per mint, SUSTAINED ≥10 s (a one-tick bundle mark is a spike, not a surge).
+     * `kind: "revival"` = no 1-minute trade candle for ≥24 h, then confirmed by the tape (≥5 buys,
+     * ≥$500 buy volume, MC ≥1.5× the pre-dormancy close) — never by a price mark; `tier` null. Both
+     * need liquidity ≥$1.5k and ≥2% of MC, and the MC gained must be paid for by buy volume. Each
+     * row: `tape` (unique_buyers null outside trade coverage), `kol`, `early_buyers` (bundled / sold
+     * / sniper), `deployer`, `risk_flags[]` (empty = no flag raised, not verified clean) and
+     * `outcome` (+1 h MC / peak / low) once ≥65 min old; `stats: "1"` adds per-(kind, tier)
+     * hit-rates over `days`. Poll with `since` (cursor `pagination.next_since`), page back with
+     * `before`, or subscribe to WS channel `token:surges` (events `token:surge` / `token:revival`).
+     * Retention 60 d. PRO+ (keyed API only).
+     */
+    getTokenSurges(params?: TokenSurgesParams): Promise<{
+        data?: TokenSurges | undefined;
         error?: string;
         status: number;
     }>;
