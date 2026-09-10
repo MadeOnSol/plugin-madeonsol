@@ -141,6 +141,29 @@ export class MadeOnSolClient {
         const qs = limit !== undefined ? `?limit=${limit}` : "";
         return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/history${qs}`);
     }
+    /**
+     * A deployer's reputation exactly as it stood on `date` (default today, UTC) —
+     * the latest write-on-change snapshot at or before it, so a backtest sees only
+     * what was knowable then. `snapshot.snapshot_date` can predate `date`
+     * (write-on-change); `snapshot.carried: true` marks that. No snapshot at or
+     * before `date` → `as_of: false, snapshot: null` — nothing is ever synthesized.
+     * `date` must be >= 2026-04-07 and not in the future. PRO+.
+     */
+    getDeployerAsOf(wallet, date) {
+        const qs = date !== undefined ? `?date=${encodeURIComponent(date)}` : "";
+        return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/as-of${qs}`);
+    }
+    /**
+     * pump.fun creator-fee rewards for a wallet, answered two ways that are never
+     * merged: `collected` (what actually reached the wallet — direct vault claims
+     * kept 90 days, social-handle claims, shareholder payouts on any token) and
+     * `attributed` (every payout on the tokens it deployed, split `to_self`/
+     * `to_others` + `redirected_pct`). Works for non-deployers too
+     * (`is_deployer: false`, `attributed` empty). PRO+.
+     */
+    getDeployerRewards(wallet) {
+        return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}/rewards`);
+    }
     // ── Deployer hunter: reputation, leaderboard, outcomes (msk_ key only) ──
     //
     // "Bonding" is the pump.fun graduation event. `bonding_rate` is LIFETIME,
