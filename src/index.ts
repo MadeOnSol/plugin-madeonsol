@@ -24,6 +24,9 @@ import { deployerRewardsAction } from "./actions/deployer-rewards.js";
 import { deployerHunterAction } from "./actions/deployer-hunter.js";
 import { tokenCandlesAction } from "./actions/token-candles.js";
 import { tokenFlowAction } from "./actions/token-flow.js";
+import { tokenTopTradersAction } from "./actions/token-top-traders.js";
+import { sniperRecentAction } from "./actions/sniper-recent.js";
+import { sniperWatchlistListAction, sniperWatchlistAddAction, sniperWatchlistRemoveAction } from "./actions/sniper-watchlist.js";
 import { tokenTradesAction } from "./actions/token-trades.js";
 import { meAction } from "./actions/me.js";
 import { tokensListAction } from "./actions/tokens-list.js";
@@ -65,6 +68,11 @@ export const madeOnSolPlugin: Plugin = {
     deployerHunterAction,
     tokenCandlesAction,
     tokenFlowAction,
+    tokenTopTradersAction,
+    sniperRecentAction,
+    sniperWatchlistListAction,
+    sniperWatchlistAddAction,
+    sniperWatchlistRemoveAction,
     tokenTradesAction,
     meAction,
     tokensListAction,
@@ -127,6 +135,7 @@ export default madeOnSolPlugin;
 export { MadeOnSolClient } from "./client.js";
 export { kolFeedAction, kolCoordinationAction, kolLeaderboardAction, deployerAlertsAction };
 export { walletTrackerWatchlistAction, walletTrackerTradesAction };
-export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenPoolsAction, tokenDepthAction, tokenHoldersAction, tokenLocksAction, tokenLocksFeedAction, tokenUnlocksAction, tokenFeeSharesAction, tokenFeeClaimsAction, tokenSurgesAction, deployerHistoryAction, deployerAsOfAction, deployerRewardsAction, deployerHunterAction, tokenCandlesAction, tokenFlowAction, tokenTradesAction };
+export { kolTokenEntryOrderAction, kolCompareAction, kolAlertsRecentAction, tokenRiskAction, tokenBundleAction, tokenPoolsAction, tokenDepthAction, tokenHoldersAction, tokenLocksAction, tokenLocksFeedAction, tokenUnlocksAction, tokenFeeSharesAction, tokenFeeClaimsAction, tokenSurgesAction, deployerHistoryAction, deployerAsOfAction, deployerRewardsAction, deployerHunterAction, tokenCandlesAction, tokenFlowAction, tokenTopTradersAction, tokenTradesAction };
+export { sniperRecentAction, sniperWatchlistListAction, sniperWatchlistAddAction, sniperWatchlistRemoveAction };
 export { meAction, tokensListAction, almostBondedAction };
 export { walletStatsAction, walletPnlAction, walletPositionsAction, walletHoldingsAction, walletTradesAction };

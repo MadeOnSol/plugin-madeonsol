@@ -1344,6 +1344,16 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /** Update a webhook's URL, subscribed events, or active state. Only passed fields change. Added 2026-09-10. */
+    updateWebhook(id: number, params: {
+        url?: string;
+        events?: string[];
+        is_active?: boolean;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
     testWebhook(webhookId: number): Promise<{
         data?: unknown;
         error?: string;
@@ -1395,6 +1405,54 @@ export declare class MadeOnSolClient {
         status: number;
     }>;
     removeFromWatchlist(walletAddress: string): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Rename (or clear, with null) the label on a wallet already in your watchlist. Added 2026-09-10. */
+    relabelWatchlist(walletAddress: string, label: string | null): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Deshred pre-confirm pump.fun deploy feed — new launches surface ~500ms before on-chain confirmation. */
+    getSniperRecent(params?: {
+        deployer_tier?: string;
+        min_bond_rate?: number;
+        since?: string;
+        watchlist?: boolean;
+        limit?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Deshred pre-confirm deploys filtered to one deployer wallet. ULTRA only. */
+    getSniperByDeployer(wallet: string, params?: {
+        limit?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** List your custom sniper watchlist (tracked deployer wallets, any tier). PRO+/ULTRA. */
+    getSniperWatchlist(): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Add one or many deployer wallets to your sniper watchlist. PRO+/ULTRA. */
+    addSniperWatchlist(params: {
+        wallet?: string;
+        wallets?: string[];
+        label?: string;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /** Remove a deployer wallet from your sniper watchlist. PRO+/ULTRA. */
+    removeSniperWatchlist(wallet: string): Promise<{
         data?: unknown;
         error?: string;
         status: number;
@@ -1709,6 +1767,17 @@ export declare class MadeOnSolClient {
         window?: "1h" | "24h";
     }): Promise<{
         data?: TokenFlow | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /** The wallets that made (or lost) the most on a token, ranked by realized PnL or ROI. Added 2026-09-10. */
+    getTokenTopTraders(mint: string, params?: {
+        limit?: number;
+        sort?: "pnl" | "roi";
+        window_days?: number;
+        min_bought_sol?: number;
+    }): Promise<{
+        data?: unknown;
         error?: string;
         status: number;
     }>;

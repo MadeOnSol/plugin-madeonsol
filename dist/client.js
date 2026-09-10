@@ -242,6 +242,10 @@ export class MadeOnSolClient {
     deleteWebhook(id) {
         return this.restRequest("DELETE", `/webhooks/${id}`);
     }
+    /** Update a webhook's URL, subscribed events, or active state. Only passed fields change. Added 2026-09-10. */
+    updateWebhook(id, params) {
+        return this.restRequest("PATCH", `/webhooks/${id}`, params);
+    }
     testWebhook(webhookId) {
         return this.restRequest("POST", "/webhooks/test", { webhook_id: webhookId });
     }
@@ -279,6 +283,40 @@ export class MadeOnSolClient {
     }
     removeFromWatchlist(walletAddress) {
         return this.restRequest("DELETE", `/wallet-tracker/watchlist/${encodeURIComponent(walletAddress)}`);
+    }
+    /** Rename (or clear, with null) the label on a wallet already in your watchlist. Added 2026-09-10. */
+    relabelWatchlist(walletAddress, label) {
+        return this.restRequest("PATCH", `/wallet-tracker/watchlist/${encodeURIComponent(walletAddress)}`, { label });
+    }
+    // ── Sniper detection (added 2026-09-10 — pre-confirm deshred deploy feed) ──
+    /** Deshred pre-confirm pump.fun deploy feed — new launches surface ~500ms before on-chain confirmation. */
+    getSniperRecent(params) {
+        const qs = new URLSearchParams();
+        if (params) {
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined)
+                    qs.set(k, String(v));
+            }
+        }
+        const query = qs.toString();
+        return this.restRequest("GET", "/sniper/recent" + (query ? "?" + query : ""));
+    }
+    /** Deshred pre-confirm deploys filtered to one deployer wallet. ULTRA only. */
+    getSniperByDeployer(wallet, params) {
+        const qs = params?.limit !== undefined ? `?limit=${params.limit}` : "";
+        return this.restRequest("GET", `/sniper/by-deployer/${encodeURIComponent(wallet)}${qs}`);
+    }
+    /** List your custom sniper watchlist (tracked deployer wallets, any tier). PRO+/ULTRA. */
+    getSniperWatchlist() {
+        return this.restRequest("GET", "/sniper/watchlist");
+    }
+    /** Add one or many deployer wallets to your sniper watchlist. PRO+/ULTRA. */
+    addSniperWatchlist(params) {
+        return this.restRequest("POST", "/sniper/watchlist", params);
+    }
+    /** Remove a deployer wallet from your sniper watchlist. PRO+/ULTRA. */
+    removeSniperWatchlist(wallet) {
+        return this.restRequest("DELETE", `/sniper/watchlist/${encodeURIComponent(wallet)}`);
     }
     getWalletTrackerTrades(params) {
         const qs = new URLSearchParams();
@@ -601,6 +639,20 @@ export class MadeOnSolClient {
     getTokenFlow(mint, params) {
         const qs = params?.window ? `?window=${params.window}` : "";
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/flow${qs}`);
+    }
+    /** The wallets that made (or lost) the most on a token, ranked by realized PnL or ROI. Added 2026-09-10. */
+    getTokenTopTraders(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        if (params?.sort !== undefined)
+            qs.set("sort", params.sort);
+        if (params?.window_days !== undefined)
+            qs.set("window_days", String(params.window_days));
+        if (params?.min_bought_sol !== undefined)
+            qs.set("min_bought_sol", String(params.min_bought_sol));
+        const query = qs.toString();
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/top-traders` + (query ? "?" + query : ""));
     }
     /** Bulk buyer-quality scoring for up to 50 mints. Shares the single-mint 5-min LRU cache. */
     getTokenBuyerQualityBatch(mints) {
