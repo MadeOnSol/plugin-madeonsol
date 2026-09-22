@@ -88,8 +88,13 @@ export interface TokenRiskDev {
   holdings_supply_pct: number | null;
   /** Is the dev wallet empty NOW (<1 token)? null when holdings unknown. */
   wallet_empty: boolean | null;
-  /** Tokens left the dev wallet WITHOUT a sell; null = unknown, never a guess. */
+  /** DEPRECATED boolean view of transfer_status: true = "suspected" (never verified), false = "none_detected", null = "unknown". */
   transferred_out: boolean | null;
+  /** Audit 2026-09-21 — suspected | none_detected | unknown. */
+  transfer_status?: "suspected" | "none_detected" | "unknown";
+  transfer_reason?: string;
+  holdings_observed_at?: string | null;
+  activity_rollup_through?: string | null;
 }
 
 /**
@@ -105,6 +110,11 @@ export type TradeCoverage = {
   scope: string;
   in_scope?: boolean | null;
   note?: string;
+  /** Audit 2026-09-21 — presence (data_observed) vs current-gate eligibility vs completeness. */
+  data_observed?: boolean | null;
+  eligibility?: "eligible" | "lapsed" | "excluded" | "unknown" | "admitted_previously" | "not_applicable" | null;
+  eligibility_basis?: string | null;
+  completeness?: "not_verified";
 };
 
 /** Transparent 0–100 rug-risk/safety score (higher = riskier). Returned by `getTokenRisk`. */
@@ -112,12 +122,17 @@ export interface TokenRisk {
   mint: string;
   risk_score: number;
   band: string;
-  factors?: Array<{ label: string; status: string; detail: string }>;
+  /** status: ok | warn | danger | unknown | not_assessed (the last two carry 0 points and never pass). */
+  factors?: Array<{ key?: string; label: string; status: "ok" | "warn" | "danger" | "unknown" | "not_assessed" | (string & {}); points?: number; detail: string }>;
   inputs?: Record<string, unknown>;
   /** v1.19 — deployer self-activity block (null = no deployer-pipeline row). Single-mint endpoint only. */
   dev?: TokenRiskDev | null;
   /** v1.19.4 — trade-coverage disclosure (single-mint endpoint). Its `note` names the split: trade-derived sub-fields are pipeline-scoped, on-chain sub-fields are unaffected. */
   coverage?: TradeCoverage;
+  /** Audit 2026-09-21 (score_version "v2") — "incomplete" = the score is a lower bound; band is never "safe" then. */
+  assessment?: { status: "complete" | "incomplete"; unknown_inputs: string[]; not_assessed: string[]; explanations?: Record<string, string> & { band_cap?: string } };
+  dev_status?: "ok" | "not_found" | "unavailable";
+  score_version?: string;
   as_of?: string;
 }
 

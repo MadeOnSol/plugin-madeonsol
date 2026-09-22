@@ -34,9 +34,15 @@ export const tokenRiskAction = {
             return undefined;
         }
         const data = result.data;
+        // unknown / not_assessed factors are disclosures, not passes — they are listed like warn/danger.
         const lines = (data.factors || [])
             .filter((f) => f.status !== "ok")
             .map((f) => `• ${f.label} [${f.status}] — ${f.detail}`);
+        if (data.assessment?.status === "incomplete") {
+            lines.push(`• Incomplete assessment (score is a lower bound): ${data.assessment.unknown_inputs.join(", ")}`);
+        }
+        if (data.assessment?.explanations?.band_cap)
+            lines.push(`• ${data.assessment.explanations.band_cap}`);
         callback?.({
             text: `Risk score for ${mint.slice(0, 8)}…: ${data.risk_score}/100 (${data.band})${lines.length ? `\n${lines.join("\n")}` : ""}`,
             content: data,

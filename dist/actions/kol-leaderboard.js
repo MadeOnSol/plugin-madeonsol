@@ -28,8 +28,16 @@ export const kolLeaderboardAction = {
                     : `Error: ${result.error}` });
             return undefined;
         }
+        // x402 serves `pnl_sol`; with an API key the call is rewritten to /api/v1, which serves `pnl`.
+        // win_rate is a percentage (0–100) on both routes.
         const data = result.data;
-        const lines = (data.leaderboard || []).map((k, i) => `${i + 1}. ${k.name}: ${k.pnl_sol > 0 ? "+" : ""}${k.pnl_sol.toFixed(2)} SOL PnL (${k.buy_count}B/${k.sell_count}S${k.win_rate != null ? `, ${(k.win_rate * 100).toFixed(0)}% WR` : ""})`);
+        const lines = (data.leaderboard || []).map((k, i) => {
+            const raw = k.pnl_sol ?? k.pnl;
+            const pnl = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
+            const pnlText = pnl == null ? "PnL n/a" : `${pnl > 0 ? "+" : ""}${pnl.toFixed(2)} SOL PnL`;
+            const wr = k.win_rate != null && Number.isFinite(Number(k.win_rate)) ? `, ${Number(k.win_rate).toFixed(0)}% WR` : "";
+            return `${i + 1}. ${k.name}: ${pnlText} (${k.buy_count}B/${k.sell_count}S${wr})`;
+        });
         callback?.({
             text: `KOL Leaderboard (${period}):\n${lines.join("\n") || "No data for this period."}`,
             content: data,
