@@ -25,6 +25,24 @@ function buildQs(params) {
     const s = sp.toString();
     return s ? `?${s}` : "";
 }
+/**
+ * Query string for GET /copytrade/signals. Maps the deprecated `rule_id` alias
+ * to `subscription_id` (the only rule filter the API reads). Exported for tests.
+ */
+export function copyTradeSignalsQuery(params) {
+    const qs = new URLSearchParams();
+    if (params) {
+        const { rule_id, subscription_id, ...rest } = params;
+        const sub = subscription_id ?? rule_id;
+        if (sub !== undefined)
+            qs.set("subscription_id", String(sub));
+        for (const [k, v] of Object.entries(rest))
+            if (v !== undefined)
+                qs.set(k, String(v));
+    }
+    const query = qs.toString();
+    return query ? `?${query}` : "";
+}
 export class MadeOnSolClient {
     baseUrl;
     fetchFn;
@@ -318,12 +336,17 @@ export class MadeOnSolClient {
     removeSniperWatchlist(wallet) {
         return this.restRequest("DELETE", `/sniper/watchlist/${encodeURIComponent(wallet)}`);
     }
+    /**
+     * GET /wallet-tracker/trades (PRO+). Returns `{ events, count, ordered_by,
+     * next_cursor, next_cursor_slot }`. `action` is "buy" or "sell" (swaps only;
+     * transfers have `action: null`, select them with `event_type: "transfer"`).
+     */
     getWalletTrackerTrades(params) {
         const qs = new URLSearchParams();
         if (params) {
             for (const [k, v] of Object.entries(params)) {
                 if (v !== undefined)
-                    qs.set(k, v);
+                    qs.set(k, String(v));
             }
         }
         const query = qs.toString() ? `?${qs.toString()}` : "";
@@ -676,10 +699,16 @@ export class MadeOnSolClient {
     getTokenBatch(mints) {
         return this.restRequest("POST", "/token/batch", { mints });
     }
-    // ── Copy-Trade Rules (PRO/ULTRA) ──
+    // ── Copy-Trade Rules (PRO+) ──
     copyTradeList() {
         return this.restRequest("GET", "/copytrade/subscriptions");
     }
+    /**
+     * Create a copy-trade rule. Signals fire only for trades by wallets
+     * MadeOnSol tracks as KOLs (GET /api/v1/kol/wallets): any valid Solana
+     * address is accepted into a rule, but an untracked wallet never produces a
+     * signal.
+     */
     copyTradeCreate(params) {
         return this.restRequest("POST", "/copytrade/subscriptions", params);
     }
@@ -772,13 +801,15 @@ export class MadeOnSolClient {
         const query = qs.toString() ? `?${qs.toString()}` : "";
         return this.restRequest("GET", `/tokens/almost-bonded${query}`);
     }
+    /**
+     * Recent fired copy-trade signals (up to 7 days). The API filters by
+     * `subscription_id`. Before 1.28.0 this method sent `rule_id`, which the API
+     * ignores, so a per-rule request silently returned every rule's signals;
+     * `rule_id` is still accepted as a deprecated alias and sent as
+     * `subscription_id`.
+     */
     copyTradeSignals(params) {
-        const qs = new URLSearchParams();
-        if (params)
-            for (const [k, v] of Object.entries(params))
-                if (v !== undefined)
-                    qs.set(k, v);
-        const query = qs.toString() ? `?${qs.toString()}` : "";
+        const query = copyTradeSignalsQuery(params);
         return this.restRequest("GET", `/copytrade/signals${query}`);
     }
     // ── Price alerts (PRO/ULTRA, v1.9) ──

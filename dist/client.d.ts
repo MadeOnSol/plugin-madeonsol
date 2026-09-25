@@ -1098,6 +1098,14 @@ export interface StreamSessionsResponse {
     sessions: StreamSession[];
     count: number;
 }
+/**
+ * Query string for GET /copytrade/signals. Maps the deprecated `rule_id` alias
+ * to `subscription_id` (the only rule filter the API reads). Exported for tests.
+ */
+export declare function copyTradeSignalsQuery(params?: {
+    subscription_id?: string | number;
+    rule_id?: string | number;
+} & Record<string, string | number | undefined>): string;
 export declare class MadeOnSolClient {
     private baseUrl;
     private fetchFn;
@@ -1481,12 +1489,22 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /**
+     * GET /wallet-tracker/trades (PRO+). Returns `{ events, count, ordered_by,
+     * next_cursor, next_cursor_slot }`. `action` is "buy" or "sell" (swaps only;
+     * transfers have `action: null`, select them with `event_type: "transfer"`).
+     */
     getWalletTrackerTrades(params?: {
         wallet?: string;
-        action?: string;
-        event_type?: string;
-        limit?: string;
-        before?: string;
+        action?: "buy" | "sell";
+        event_type?: "swap" | "transfer";
+        limit?: string | number;
+        /** "slot" (on-chain order, default on a first page) or "block_time" (ingest clock). */
+        order?: "slot" | "block_time";
+        /** Cursor for order "slot": the previous page's next_cursor_slot. */
+        before_slot?: string | number;
+        /** Legacy cursor for order "block_time": the previous page's next_cursor. */
+        before?: string | number;
     }): Promise<{
         data?: unknown;
         error?: string;
@@ -1839,13 +1857,28 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /**
+     * Create a copy-trade rule. Signals fire only for trades by wallets
+     * MadeOnSol tracks as KOLs (GET /api/v1/kol/wallets): any valid Solana
+     * address is accepted into a rule, but an untracked wallet never produces a
+     * signal.
+     */
     copyTradeCreate(params: {
-        /** 1-50 wallets to copy trades from. */
+        /**
+         * Wallets to copy trades from. The per-rule limit is set by your tier and
+         * enforced by the server: PRO 5, ULTRA 50, BUSINESS 250 (Enterprise
+         * follows Business).
+         */
         source_wallets: string[];
-        /** Required. Fixed SOL amount, proportional multiplier, or percent of source — per sizing_mode. */
+        /**
+         * Required. SOL when sizing_mode is "fixed"; otherwise a multiplier /
+         * fraction of the source size (0.25 = a quarter), never a percent.
+         * "proportional" and "percent_source" are the same maths.
+         */
         sizing_amount: number;
         name?: string;
         min_trade_sol?: number;
+        /** Default "buy" (server side) when omitted. */
         only_action?: "buy" | "sell" | "both";
         sizing_mode?: "fixed" | "proportional" | "percent_source";
         delivery_mode?: "webhook" | "websocket" | "both";
@@ -2017,10 +2050,26 @@ export declare class MadeOnSolClient {
         error?: string;
         status: number;
     }>;
+    /**
+     * Recent fired copy-trade signals (up to 7 days). The API filters by
+     * `subscription_id`. Before 1.28.0 this method sent `rule_id`, which the API
+     * ignores, so a per-rule request silently returned every rule's signals;
+     * `rule_id` is still accepted as a deprecated alias and sent as
+     * `subscription_id`.
+     */
     copyTradeSignals(params?: {
-        rule_id?: string;
-        limit?: string;
+        /** Filter to one rule (the rule's `id`). */
+        subscription_id?: string | number;
+        /** @deprecated Use `subscription_id`. */
+        rule_id?: string | number;
+        /** 1–500, default 50. */
+        limit?: string | number;
+        /** ISO 8601: only signals fired at or after this time. */
         since?: string;
+        /** Keep signals whose source trade's market cap (USD) was at least this; drops unknown-MC signals. */
+        min_mc_usd?: string | number;
+        /** Keep signals whose source trade's market cap (USD) was at most this; drops unknown-MC signals. */
+        max_mc_usd?: string | number;
     }): Promise<{
         data?: unknown;
         error?: string;

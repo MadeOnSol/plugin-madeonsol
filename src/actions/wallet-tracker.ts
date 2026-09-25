@@ -96,10 +96,26 @@ export const walletTrackerTradesAction: Action = {
       return undefined;
     }
 
-    const data = result.data as { events: Array<{ wallet_address: string; label: string | null; action: string; token_symbol: string | null; sol_amount: number; block_time_iso: string }>; count: number };
-    const lines = (data.events || []).slice(0, 15).map(
-      (e) => `${e.label || e.wallet_address.slice(0, 8)} ${e.action} ${e.token_symbol || "?"} for ${Number(e.sol_amount).toFixed(2)} SOL`
-    );
+    // Shape of GET /wallet-tracker/trades events. `action` is null on transfers.
+    const data = result.data as {
+      events: Array<{
+        wallet_address: string;
+        label: string | null;
+        event_type: "swap" | "transfer";
+        action: "buy" | "sell" | null;
+        token_symbol: string | null;
+        sol_amount: number | null;
+        ingested_at: string;
+      }>;
+      count: number;
+    };
+    const lines = (data.events || []).slice(0, 15).map((e) => {
+      const who = e.label || e.wallet_address.slice(0, 8);
+      const sol = e.sol_amount == null ? "?" : Number(e.sol_amount).toFixed(2);
+      return e.event_type === "transfer" || e.action == null
+        ? `${who} transfer of ${sol} SOL`
+        : `${who} ${e.action} ${e.token_symbol || "?"} for ${sol} SOL`;
+    });
 
     callback?.({
       text: lines.length

@@ -65,8 +65,15 @@ export const walletTrackerTradesAction = {
             callback?.({ text: `Error: ${result.error}` });
             return undefined;
         }
+        // Shape of GET /wallet-tracker/trades events. `action` is null on transfers.
         const data = result.data;
-        const lines = (data.events || []).slice(0, 15).map((e) => `${e.label || e.wallet_address.slice(0, 8)} ${e.action} ${e.token_symbol || "?"} for ${Number(e.sol_amount).toFixed(2)} SOL`);
+        const lines = (data.events || []).slice(0, 15).map((e) => {
+            const who = e.label || e.wallet_address.slice(0, 8);
+            const sol = e.sol_amount == null ? "?" : Number(e.sol_amount).toFixed(2);
+            return e.event_type === "transfer" || e.action == null
+                ? `${who} transfer of ${sol} SOL`
+                : `${who} ${e.action} ${e.token_symbol || "?"} for ${sol} SOL`;
+        });
         callback?.({
             text: lines.length
                 ? `Recent wallet tracker events:\n${lines.join("\n")}`
