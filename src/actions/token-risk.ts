@@ -11,7 +11,7 @@ const MINT_RE = /\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/;
 export const tokenRiskAction: Action = {
   name: "GET_TOKEN_RISK",
   description:
-    "Get a transparent 0–100 rug-risk/safety score for a Solana token from MadeOnSol (higher = riskier). Returns a band (safe/caution/danger) and an explainable factors breakdown. PRO+.",
+    "Get a transparent 0–100 risk score (evidence, not a verdict) for a Solana token from MadeOnSol (higher = riskier). Returns a band (enum values 'safe'/'caution'/'danger' label score ranges; they are not a safety guarantee) and an explainable factors breakdown. PRO+.",
   similes: [
     "token risk",
     "is this a rug",

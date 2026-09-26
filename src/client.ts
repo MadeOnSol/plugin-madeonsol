@@ -117,7 +117,7 @@ export type TradeCoverage = {
   completeness?: "not_verified";
 };
 
-/** Transparent 0–100 rug-risk/safety score (higher = riskier). Returned by `getTokenRisk`. */
+/** Transparent 0–100 risk score (higher = riskier): risk evidence for your own policy, not a verdict. Returned by `getTokenRisk`. */
 export interface TokenRisk {
   mint: string;
   risk_score: number;
@@ -1298,8 +1298,9 @@ export class MadeOnSolClient {
   }
 
   /**
-   * One deployer's profile. An UNTRACKED wallet returns zeroed counters, not a
-   * 404 — check `total_deployed` before drawing a conclusion.
+   * One deployer's profile. An UNTRACKED wallet returns HTTP 200 with
+   * `is_deployer: false` and `deployer: null`, not a 404 — check `is_deployer`
+   * and `deployer.total_tokens_deployed` before drawing a conclusion.
    */
   getDeployerProfile(wallet: string) {
     return this.restRequest("GET", `/deployer-hunter/${encodeURIComponent(wallet)}`);
@@ -1594,7 +1595,7 @@ export class MadeOnSolClient {
     return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/buyer-quality`);
   }
 
-  /** Transparent 0–100 rug-risk/safety score (higher = riskier) with band, explainable factors, and raw inputs. PRO+. */
+  /** Transparent 0–100 risk score (higher = riskier): risk evidence for your own policy, not a verdict with band, explainable factors, and raw inputs. PRO+. */
   getTokenRisk(mint: string) {
     return this.restRequest<TokenRisk>("GET", `/tokens/${encodeURIComponent(mint)}/risk`);
   }
