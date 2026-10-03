@@ -115,6 +115,8 @@ export type TradeCoverage = {
   eligibility?: "eligible" | "lapsed" | "excluded" | "unknown" | "admitted_previously" | "not_applicable" | null;
   eligibility_basis?: string | null;
   completeness?: "not_verified";
+  /** Server 2026-09-30 — buys under min_sol SOL (under min_stable_usd in USDC/USDT) are not stored; SOL-receiving sells are kept at any size. Streams, prices and candles are not subject to it. */
+  size_floor?: { min_sol: number; min_stable_usd: number; applies_to: string };
 };
 
 /** Transparent 0–100 risk score (higher = riskier): risk evidence for your own policy, not a verdict. Returned by `getTokenRisk`. */
@@ -257,7 +259,8 @@ export interface TokenDepthUnsupportedPool {
 /**
  * Per-pool price-impact / slippage for a token — "how much SOL to move price N%".
  * Impact is per-pool, NOT router-optimal. Returned by `getTokenDepth`.
- * `found: false` (empty pools) means no pools are tracked for the mint.
+ * `found: false` (empty `pools`) means no pool has sufficient authoritative data
+ * for depth — tracked pools that lack it are in `unsupported_pools` with a `reason`.
  */
 export interface TokenDepth {
   mint: string;
@@ -306,8 +309,8 @@ export interface TokenHolderExcluded {
 
 /**
  * Live holder census + concentration — who holds NOW. Returned by `getTokenHolders`.
- * `concentration.holder_count` is EXACT (census) and null ONLY when the provider
- * refused the census (see `source.census_fallback_reason`) — never trade-estimated.
+ * `concentration.holder_count` is EXACT (census) and null ONLY when the census
+ * was not served: provider refusal, timeout, or balances above the mint supply (see `source.census_fallback_reason`) — never trade-estimated.
  * Raw amounts are u64 STRINGS. Disclosure PRO 10 / ULTRA 50 / BUSINESS 100.
  */
 export interface TokenHolders {
@@ -379,10 +382,29 @@ export interface TokenLockNextUnlock {
  * `*_raw` = base units as digit STRINGS — never coerce to a float; ui / usd / pct are null when
  * decimals or price are unknown. LP locks are NOT included in this feature.
  */
+/**
+ * Who runs the lock contract (2026-10-02). verified = known provider program
+ * (Streamflow / Jupiter Lock / Bonfida); compatible = shape matches a known
+ * provider but the operator is NOT identified; unverified = unknown. lock_url
+ * is set only where a per-lock page format is proven (always null on Solana).
+ */
+export interface TokenLockProvider {
+  id: string | null;
+  name: string | null;
+  identity: "verified" | "compatible" | "unverified";
+  compatible_with: string | null;
+  website_url: string | null;
+  lock_url: string | null;
+}
+
 export interface TokenLock {
   /** The contract account (Streamflow stream / Jupiter VestingEscrow / Bonfida vesting account). */
   lock_account: string;
   program: TokenLockProgram;
+  /** 2026-10-02 — who runs the locker and how sure we are. */
+  provider: TokenLockProvider;
+  /** 2026-10-02 — Solana Explorer links (independent evidence). */
+  explorer: { lock_account_url: string | null; creation_tx_url: string | null };
   /** lock = whole amount at one date; vesting = cliff and/or periodic release. */
   kind: TokenLockKind;
   /** Derived at request time. */
@@ -395,6 +417,8 @@ export interface TokenLock {
   amount_raw: string;
   amount: number | null;
   amount_usd: number | null;
+  /** 2026-10-02 — the price behind every *_usd field. */
+  price_usd: number | null;
   amount_pct_of_supply: number | null;
   /** Still locked right now (amount − unlocked-so-far); 0 unless active. */
   locked_raw: string;
@@ -413,6 +437,10 @@ export interface TokenLock {
   cliff_at: string | null;
   /** Fully unlocked at; null = perpetual / no schedule. */
   end_at: string | null;
+  /** 2026-10-02 — >= 0; 0 once completed; null when perpetual or cancelled / closed. */
+  seconds_until_end: number | null;
+  /** 2026-10-02 — seconds until next_unlock.at; null without a next unlock. */
+  seconds_until_next_unlock: number | null;
   period_seconds: number | null;
   /** period < 1h (per-second stream). */
   continuous: boolean;
@@ -422,6 +450,8 @@ export interface TokenLock {
   cliff_amount: number | null;
   perpetual: boolean;
   next_unlock: TokenLockNextUnlock | null;
+  /** Bonfida vesting only: the tranche list. */
+  schedule?: Array<{ release_at: string | null; amount_raw: string }>;
   /** The locker can cancel — funds are locked against the recipient, not the locker. */
   cancelable_by_sender: boolean | null;
   cancelable_by_recipient: boolean | null;
@@ -1646,7 +1676,7 @@ export class MadeOnSolClient {
    * bought first). Read live from the ledger at `confirmed`: every token account of
    * the mint (mint-scoped `getProgramAccounts`), merged per owner. `concentration.holder_count`
    * is EXACT (distinct non-zero owners minus excluded pools/curves/burns) and null ONLY
-   * when the provider refuses the census for a mega-cap (then `source.method` is
+   * when the census is not served (provider refusal for a mega-cap, a timeout, or balances adding up to more than the mint supply) (then `source.method` is
    * `getTokenLargestAccounts`, `source.census_fallback_reason` is set and only the top-20
    * view is served) — never estimated from trades. Each disclosed owner carries `labels[]`
    * (deployer / kol / early_buyer / buyer / bundle / bot / dump_cluster; empty = unknown,

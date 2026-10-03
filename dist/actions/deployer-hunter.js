@@ -138,7 +138,8 @@ export const deployerHunterAction = {
                 return undefined;
             }
             // Default: the leaderboard.
-            const sort = /\brecent\b/.test(text) ? "recent" : /\btotal\b/.test(text) ? "total_bonded" : "bonding_rate";
+            // Route sort enum: bonding_rate | recent_bond_rate | total_bonded | last_deploy_at | post_bond_survival_rate ("recent" was a 400).
+            const sort = /\brecent\b/.test(text) ? "recent_bond_rate" : /\btotal\b/.test(text) ? "total_bonded" : "bonding_rate";
             const tier = /\belite\b/.test(text) ? "elite" : /\bgood\b/.test(text) ? "good" : /\brising\b/.test(text) ? "rising" : undefined;
             const d = (await client.getDeployerLeaderboard({ sort, tier, limit: 15 }));
             const deployers = d.deployers ?? [];

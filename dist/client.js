@@ -511,7 +511,7 @@ export class MadeOnSolClient {
      * bought first). Read live from the ledger at `confirmed`: every token account of
      * the mint (mint-scoped `getProgramAccounts`), merged per owner. `concentration.holder_count`
      * is EXACT (distinct non-zero owners minus excluded pools/curves/burns) and null ONLY
-     * when the provider refuses the census for a mega-cap (then `source.method` is
+     * when the census is not served (provider refusal for a mega-cap, a timeout, or balances adding up to more than the mint supply) (then `source.method` is
      * `getTokenLargestAccounts`, `source.census_fallback_reason` is set and only the top-20
      * view is served) — never estimated from trades. Each disclosed owner carries `labels[]`
      * (deployer / kol / early_buyer / buyer / bundle / bot / dump_cluster; empty = unknown,

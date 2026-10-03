@@ -1,6 +1,6 @@
 {
   "name": "@madeonsol/plugin-madeonsol",
-  "version": "1.28.1",
+  "version": "1.30.0",
   "description": "ElizaOS plugin for MadeOnSol — Solana KOL intelligence and deployer analytics via x402 micropayments",
   "repository": {
     "type": "git",

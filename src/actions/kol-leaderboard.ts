@@ -43,11 +43,12 @@ export const kolLeaderboardAction: Action = {
       return undefined;
     }
 
-    // x402 serves `pnl_sol`; with an API key the call is rewritten to /api/v1, which serves `pnl`.
+    // Both routes serve `pnl` since 2026-10-03; `pnl_sol` is the x402 route's deprecated alias
+    // (removed after 2026-11-03) and only a fallback for an older server.
     // win_rate is a percentage (0–100) on both routes.
     const data = result.data as { leaderboard: Array<{ name: string; pnl_sol?: number | null; pnl?: number | null; buy_count: number; sell_count: number; win_rate: number | null }> };
     const lines = (data.leaderboard || []).map((k, i) => {
-      const raw = k.pnl_sol ?? k.pnl;
+      const raw = k.pnl ?? k.pnl_sol;
       const pnl = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
       const pnlText = pnl == null ? "PnL n/a" : `${pnl > 0 ? "+" : ""}${pnl.toFixed(2)} SOL PnL`;
       const wr = k.win_rate != null && Number.isFinite(Number(k.win_rate)) ? `, ${Number(k.win_rate).toFixed(0)}% WR` : "";
