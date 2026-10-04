@@ -1251,7 +1251,7 @@ export class MadeOnSolClient {
     return this.query("/api/x402/kol/compare", { wallets: wallets.join(",") });
   }
 
-  getKolAlertsRecent(params?: { window?: string; types?: string; min_severity?: string; limit?: string }) {
+  getKolAlertsRecent(params?: { window?: "1h" | "6h" | "24h"; types?: string; limit?: string }) {
     return this.query("/api/x402/kol/alerts/recent", params);
   }
 

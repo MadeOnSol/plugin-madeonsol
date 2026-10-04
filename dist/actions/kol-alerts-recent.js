@@ -20,7 +20,7 @@ export const kolAlertsRecentAction = {
     handler: async (runtime, message, _state, _options, callback) => {
         const client = getClient(runtime);
         const text = (message.content?.text || "").toLowerCase();
-        const window = text.includes("1h") ? "1h" : text.includes("6h") ? "6h" : text.includes("24h") ? "24h" : text.includes("5m") ? "5m" : "15m";
+        const window = text.includes("24h") ? "24h" : text.includes("6h") ? "6h" : text.includes("1h") ? "1h" : "6h";
         const result = await client.getKolAlertsRecent({ window, limit: "20" });
         if (result.error) {
             callback?.({ text: result.status === 402

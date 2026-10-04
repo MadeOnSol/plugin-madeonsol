@@ -1258,9 +1258,8 @@ export declare class MadeOnSolClient {
         status: number;
     }>;
     getKolAlertsRecent(params?: {
-        window?: string;
+        window?: "1h" | "6h" | "24h";
         types?: string;
-        min_severity?: string;
         limit?: string;
     }): Promise<{
         data?: unknown;
