@@ -1458,7 +1458,7 @@ export class MadeOnSolClient {
 
   // ── Sniper detection (added 2026-09-10 — pre-confirm deshred deploy feed) ──
 
-  /** Deshred pre-confirm pump.fun deploy feed — new launches surface ~500ms before on-chain confirmation. */
+  /** Early deploy observations; ULTRA/BUSINESS/ENTERPRISE API key only. Execution is initially unknown; no guaranteed lead time. */
   getSniperRecent(params?: { deployer_tier?: string; min_bond_rate?: number; since?: string; watchlist?: boolean; limit?: number }) {
     const qs = new URLSearchParams();
     if (params) {
@@ -1470,23 +1470,23 @@ export class MadeOnSolClient {
     return this.restRequest("GET", "/sniper/recent" + (query ? "?" + query : ""));
   }
 
-  /** Deshred pre-confirm deploys filtered to one deployer wallet. ULTRA only. */
+  /** Early deploy observations filtered to one deployer wallet. ULTRA/BUSINESS/ENTERPRISE only. */
   getSniperByDeployer(wallet: string, params?: { limit?: number }) {
     const qs = params?.limit !== undefined ? `?limit=${params.limit}` : "";
     return this.restRequest("GET", `/sniper/by-deployer/${encodeURIComponent(wallet)}${qs}`);
   }
 
-  /** List your custom sniper watchlist (tracked deployer wallets, any tier). PRO+/ULTRA. */
+  /** List your custom sniper watchlist (tracked deployer wallets, any tier). ULTRA/BUSINESS/ENTERPRISE. */
   getSniperWatchlist() {
     return this.restRequest("GET", "/sniper/watchlist");
   }
 
-  /** Add one or many deployer wallets to your sniper watchlist. PRO+/ULTRA. */
+  /** Add one or many deployer wallets to your sniper watchlist. ULTRA/BUSINESS/ENTERPRISE. */
   addSniperWatchlist(params: { wallet?: string; wallets?: string[]; label?: string }) {
     return this.restRequest("POST", "/sniper/watchlist", params);
   }
 
-  /** Remove a deployer wallet from your sniper watchlist. PRO+/ULTRA. */
+  /** Remove a deployer wallet from your sniper watchlist. ULTRA/BUSINESS/ENTERPRISE. */
   removeSniperWatchlist(wallet: string) {
     return this.restRequest("DELETE", `/sniper/watchlist/${encodeURIComponent(wallet)}`);
   }
@@ -1869,10 +1869,15 @@ export class MadeOnSolClient {
   }
 
   /**
-   * Create a copy-trade rule. Signals fire only for trades by wallets
-   * MadeOnSol tracks as KOLs (GET /api/v1/kol/wallets): any valid Solana
-   * address is accepted into a rule, but an untracked wallet never produces a
-   * signal.
+   * Create a copy-trade rule. Which source wallets fire depends on the
+   * server's engine, reported on each rule as `source_admission`:
+   * `any_wallet` (server 2026-10-04 rollout) = any valid Solana wallet, KOL or
+   * not, no Wallet Tracker entry or quota needed; `kol_only` (legacy) = only
+   * wallets MadeOnSol tracks as KOLs (GET /api/v1/kol/wallets), other wallets
+   * are accepted but never produce a signal. `operational_state` says whether
+   * the rule can fire right now (eligible / monitoring_pending /
+   * monitoring_unavailable / source_capacity_unavailable / no_tracked_sources /
+   * unknown).
    */
   copyTradeCreate(params: {
     /**
@@ -2153,3 +2158,4 @@ export class MadeOnSolClient {
     return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/peak-history`);
   }
 }
+

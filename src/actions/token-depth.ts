@@ -1,6 +1,7 @@
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback } from "@elizaos/core";
 import { MadeOnSolClient } from "../client.js";
 import { MADEONSOL_CLIENT_KEY } from "../index.js";
+import { formatDepthPoolLine, type DepthPool } from "./depth-format.js";
 
 function getClient(runtime: IAgentRuntime): MadeOnSolClient {
   return ((runtime as unknown as Record<string, unknown>)[MADEONSOL_CLIENT_KEY] as MadeOnSolClient) ?? new MadeOnSolClient();
@@ -52,12 +53,7 @@ export const tokenDepthAction: Action = {
     const data = result.data as {
       found: boolean;
       primary_pool?: string | null;
-      pools: Array<{
-        pool_address: string;
-        dex: string;
-        quotes: Array<{ size_sol: number; price_impact_pct: number }>;
-        to_move_price: { "1pct": number; "5pct": number; "10pct": number };
-      }>;
+      pools: DepthPool[];
       unsupported_pools: Array<{ pool_address: string; dex: string; reason: string }>;
     };
 
@@ -69,10 +65,8 @@ export const tokenDepthAction: Action = {
       return undefined;
     }
 
-    const lines = data.pools.slice(0, 3).map((p) => {
-      const impacts = p.quotes.map((q) => `${q.size_sol} SOL → ${q.price_impact_pct}%`).join(", ");
-      return `• ${p.dex} ${p.pool_address.slice(0, 8)}… — impact: ${impacts}; to move 1%/5%/10%: ${p.to_move_price["1pct"].toFixed(2)}/${p.to_move_price["5pct"].toFixed(2)}/${p.to_move_price["10pct"].toFixed(2)} SOL`;
-    });
+    // COV-36: unquotable concentrated-pool sizes render their status, not `null%`.
+    const lines = data.pools.slice(0, 3).map(formatDepthPoolLine);
 
     callback?.({
       text: `Depth for ${mint.slice(0, 8)}… (${data.pools.length} pool${data.pools.length === 1 ? "" : "s"}${data.unsupported_pools.length ? `, ${data.unsupported_pools.length} unsupported` : ""})\n${lines.join("\n")}`,

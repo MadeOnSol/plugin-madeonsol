@@ -1,5 +1,6 @@
 import { MadeOnSolClient } from "../client.js";
 import { MADEONSOL_CLIENT_KEY } from "../index.js";
+import { formatDepthPoolLine } from "./depth-format.js";
 function getClient(runtime) {
     return runtime[MADEONSOL_CLIENT_KEY] ?? new MadeOnSolClient();
 }
@@ -41,10 +42,8 @@ export const tokenDepthAction = {
             });
             return undefined;
         }
-        const lines = data.pools.slice(0, 3).map((p) => {
-            const impacts = p.quotes.map((q) => `${q.size_sol} SOL → ${q.price_impact_pct}%`).join(", ");
-            return `• ${p.dex} ${p.pool_address.slice(0, 8)}… — impact: ${impacts}; to move 1%/5%/10%: ${p.to_move_price["1pct"].toFixed(2)}/${p.to_move_price["5pct"].toFixed(2)}/${p.to_move_price["10pct"].toFixed(2)} SOL`;
-        });
+        // COV-36: unquotable concentrated-pool sizes render their status, not `null%`.
+        const lines = data.pools.slice(0, 3).map(formatDepthPoolLine);
         callback?.({
             text: `Depth for ${mint.slice(0, 8)}… (${data.pools.length} pool${data.pools.length === 1 ? "" : "s"}${data.unsupported_pools.length ? `, ${data.unsupported_pools.length} unsupported` : ""})\n${lines.join("\n")}`,
             content: data,
