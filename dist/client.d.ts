@@ -308,6 +308,8 @@ export interface TokenHolders {
         holder_count_source: "census" | null;
         token_accounts_nonzero: number | null;
         supply_raw: string | null;
+        supply_source?: "mint_account" | "token_prices_cache" | "rpc_token_supply" | null;
+        supply_consistent?: boolean;
         circulating_raw: string | null;
         decimals: number | null;
         top1_share: number | null;
@@ -1103,6 +1105,18 @@ export interface TokenTradeEntry {
     slot: number | null;
     block_time: number;
     traded_at: string;
+    /** Exact on-chain amounts (#508), present once enabled server-side. Integers are
+     *  decimal strings; `raw_known: false` = legacy row, every field null (unknown, never 0).
+     *  `sol_net_lamports` excludes the tx fee and token-account rent; null unless SOL settled the trade. */
+    amounts?: {
+        token_raw: string | null;
+        token_decimals: number | null;
+        sol_net_lamports: string | null;
+        quote_mint: string | null;
+        quote_raw: string | null;
+        quote_decimals: number | null;
+        raw_known: boolean;
+    };
 }
 /**
  * Mint-scoped trade tape (cursor-paginated, newest first). `coverage` is the honesty
@@ -1675,6 +1689,53 @@ export declare class MadeOnSolClient {
      */
     getTokenBundle(mint: string): Promise<{
         data?: TokenBundle | undefined;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Every coordinated buy cluster on a token in a window, the launch bundle AND clusters that
+     * enter later (GET /tokens/{mint}/bundles). A cluster is a slot where at least `min_wallets`
+     * distinct wallets bought. Only stored buys count (persistence floor 0.05 SOL / $3.50 stable leg).
+     * `summary.baseline` gives buys per active slot: a cluster is evidence, not a verdict.
+     * `include_balances` adds `held_now` to the 3 most recent clusters. PRO+, API key only.
+     */
+    getTokenBundles(mint: string, params?: {
+        window?: "1h" | "6h" | "24h";
+        min_wallets?: number;
+        limit?: number;
+        include_balances?: boolean;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * One figure: `bundled_pct_of_supply_now`, the share of supply held now by every bundle wallet
+     * (launch bundle plus the window's clusters, each wallet once), read from chain balances
+     * (GET /tokens/{mint}/bundle-share). Null with `held_now.incomplete_reason` unless every wallet
+     * was read, never a partial sum. Cached 30 s per token. PRO+, API key only.
+     */
+    getTokenBundleShare(mint: string, params?: {
+        window?: "1h" | "6h" | "24h";
+        min_wallets?: number;
+    }): Promise<{
+        data?: unknown;
+        error?: string;
+        status: number;
+    }>;
+    /**
+     * Every stored KOL trade on one token, newest first, keyset paged with `next_cursor`
+     * (GET /kol/tokens/{mint}/trades). BASIC: 5-minute delay, 20 rows. Trades below the KOL
+     * persistence floor are not stored. `since` is an ISO timestamp, `kol` a KOL wallet. API key only.
+     */
+    getKolTokenTrades(mint: string, params?: {
+        limit?: number;
+        action?: "buy" | "sell";
+        kol?: string;
+        since?: string;
+        cursor?: string;
+    }): Promise<{
+        data?: unknown;
         error?: string;
         status: number;
     }>;

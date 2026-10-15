@@ -1,5 +1,12 @@
 # @madeonsol/plugin-madeonsol
 
+> **Six-family early-stream expansion (#457, not activated):** the managed `earlyStream()`
+> client, private-list controls and token/wallet helpers are implemented in the
+> `madeonsol-x402` TypeScript SDK. This package does **not** gain that managed client
+> or new MCP/plugin actions from this PR. Existing sniper compatibility is ULTRA+
+> and deploy-only. See the [release-candidate wire contract](https://madeonsol.com/docs/shredprism-stream.md)
+> for raw WebSocket integration; publication/version parity remains a release gate.
+
 [![npm version](https://img.shields.io/npm/v/@madeonsol/plugin-madeonsol?style=flat-square)](https://www.npmjs.com/package/@madeonsol/plugin-madeonsol)
 [![npm downloads](https://img.shields.io/npm/dm/@madeonsol/plugin-madeonsol?style=flat-square)](https://www.npmjs.com/package/@madeonsol/plugin-madeonsol)
 [![ElizaOS](https://img.shields.io/badge/ElizaOS-plugin-blueviolet?style=flat-square)](https://elizaos.github.io/)
@@ -13,11 +20,13 @@ ElizaOS plugin for [MadeOnSol](https://madeonsol.com) — Solana KOL trading int
 
 > Real-time Solana trading intelligence: track 2,000+ KOL wallets with <3s latency on paid keys and x402 pay-per-call (free-tier live feeds are 5-min delayed), score 85K+ Pump.fun deployers, expose bundle-cohort held-% of supply (the rug/insider signal), verify any wallet's CURRENT on-chain holdings straight from its token accounts, surface deshred deploy signals ~500ms before on-chain confirmation, detect multi-KOL coordination, and stream every DEX trade. Free tier: 200 requests/day across 40+ endpoints (live feeds 5-min delayed) — no signup payment. Get a key at [madeonsol.com/pricing](https://madeonsol.com/pricing).
 
-> **Server update 2026-10-05 (no package change needed): realtime developer activity and USDC/USDT trade sizing.** The webhook event `dev:activity` (PRO+) and, on the Ultra DEX firehose socket, `dev_subscribe` → `dev:activity` + `dev:activity_enrichment` (same `id`) now deliver a token developer's `dev_sell`, `dev_buy`, `dev_token_transfer_out` and `dev_token_transfer_in` as they happen (a transfer is never a sell; PRO gets the developer's own events without identity fields; transfer coverage is partial, see `transfer_watch_coverage`). On `dex:trades`, a swap paid in USDC or USDT now carries `sol_amount` = the SOL equivalent of its stable leg (used by `dust`, `min_sol`, `max_sol`) plus the additive fields `sol_amount_basis` (`native_sol` | `stable_quote_equivalent` | `stable_quote_unconverted`) and `stable_quote`; `stable_quote_unconverted` means `sol_amount` 0 (size unknown). Details: [changelog](https://madeonsol.com/changelog).
+> **Server update 2026-10-05/08 (no package change needed): realtime developer activity and USDC/USDT trade sizing.** The signed webhook event `dev:activity` (PRO+) and the ULTRA+ DEX-socket `dev_subscribe` path deliver `dev_sell`, `dev_buy`, `dev_token_transfer_out` and `dev_token_transfer_in` (a transfer is never a sell). Transfer detection is now the union of the legacy bounded developer-wallet watch and the broad SPL Token/Token-2022 candidate source for attributed creators while live. `transfer_watch_coverage` describes only the legacy watch; `transfer_sources.broad` in the subscribe ack reports broad-source state/gaps. Recovered broad-source rows are REST history only, never retroactive realtime alerts. Missing creator attribution, source gaps and unsupported mixed swap + standalone-transfer cases remain limitations. On `dex:trades`, a swap paid in USDC or USDT now carries `sol_amount` = the SOL equivalent of its stable leg (used by `dust`, `min_sol`, `max_sol`) plus the additive fields `sol_amount_basis` (`native_sol` | `stable_quote_equivalent` | `stable_quote_unconverted`) and `stable_quote`; `stable_quote_unconverted` means `sol_amount` 0 (size unknown). Details: [changelog](https://madeonsol.com/changelog).
 
 > **Server update 2026-10-04 (no package change needed): copy-trade rules follow any valid source wallet.** `source_wallets` no longer have to be tracked KOL wallets: any valid Solana wallet fires, KOL membership is optional enrichment, and copy-trade sources do not use Wallet Tracker quota. Each rule reports `source_admission` (`any_wallet`) and `operational_state` (`eligible`, or an infrastructure state `monitoring_pending` / `monitoring_unavailable` / `source_capacity_unavailable`). `source_wallets_tracked` / `source_wallets_untracked` and the `untracked_source_wallets` warning are legacy fields, still filled. This supersedes the "signals fire only for tracked KOL wallets" wording in older notes below. Limits are unchanged: PRO 3 rules × 5 wallets, ULTRA 20 × 50, BUSINESS 100 × 250.
 
 > **New in 1.29.0: token lock provenance.** Typed + action description: Token lock rows carry `provider` (`identity` verified | compatible | unverified; `lock_url` always null on Solana, never constructed), `explorer` (Solana Explorer links), `price_usd`, `seconds_until_end`, `seconds_until_next_unlock` and, for Bonfida, the tranche `schedule` (server 2026-10-02). Additive only.
+
+> **New in 1.31.0: bundle clusters, bundle share now, and KOL trades per token.** Three actions + client methods, keyed `msk_` API only (no x402 route; in x402 mode the client refuses them before any request). `GET_TOKEN_BUNDLES` (`client.getTokenBundles(mint, { window, min_wallets, limit, include_balances })`, PRO+) binds `GET /tokens/{mint}/bundles`: every slot in a 1h/6h/24h window where at least `min_wallets` distinct wallets bought, launch and later; only stored buys count, and `summary.baseline` shows buys per active slot, so a cluster is evidence, not a verdict. `GET_TOKEN_BUNDLE_SHARE` (`client.getTokenBundleShare(mint, { window, min_wallets })`, PRO+) binds `GET /tokens/{mint}/bundle-share`: `bundled_pct_of_supply_now`, the share of supply all bundle wallets hold now from chain balances; it is null with `held_now.incomplete_reason` unless every wallet was read. `GET_KOL_TOKEN_TRADES` (`client.getKolTokenTrades(mint, { limit, action, kol, since, cursor })`) binds `GET /kol/tokens/{mint}/trades`: every stored KOL trade on one token, newest first, `next_cursor` paging; BASIC gets a 5-minute delay and 20 rows.
 
 > **New in 1.30.0:** `TradeCoverage.size_floor` is typed, and the holder census action names every fallback reason (provider refusal, timeout, or a census refused because its balances exceeded the supply).
 
@@ -121,6 +130,9 @@ Gives your ElizaOS agent access to MadeOnSol's Solana intelligence API.
 | `GET_TOKEN_FLOW` | **New 1.13** · Net buy/sell flow over a 1h/24h window — unique wallets/buyers/sellers, buy/sell counts, buy/sell/net SOL, trades-per-wallet (PRO+) |
 | `GET_TOKEN_TRADES` | **New 1.18** · Mint-scoped trade tape — cursor-paginated raw trades with price + early-buyer rank, full history (starts 2026-04-12, pump.fun-pipeline scoped) (PRO+) |
 | `GET_TOKEN_BUNDLE` | **New 1.16** · Bundle-cohort holdings — same-slot "bundle" wallets and their `held_pct_of_supply` (rug/insider signal). BASIC=summary; PRO=top-10 flags; ULTRA=+KOL identity |
+| `GET_TOKEN_BUNDLES` | **New 1.31** · Every coordinated buy cluster (launch and later) in a 1h/6h/24h window; a cluster is evidence, not a verdict. PRO+ |
+| `GET_TOKEN_BUNDLE_SHARE` | **New 1.31** · `bundled_pct_of_supply_now` from chain balances; null with a reason unless every wallet was read. PRO+ |
+| `GET_KOL_TOKEN_TRADES` | **New 1.31** · Every stored KOL trade on one token, newest first, cursor paged. BASIC 5-min delay, 20 rows |
 | `GET_TOKEN_POOLS` | **New 1.16.2** · Per-venue liquidity map — every DEX pool a token trades in, live vs parked, plus fragmentation + top-pool share (PRO+) |
 | `GET_TOKEN_DEPTH` | **New 1.19** · Per-pool price impact / slippage — quotes per SOL buy size + SOL to move price 1%/5%/10%; unsupported pools flagged with a reason (PRO+) |
 | `GET_TOKEN_HOLDERS` | **New** · Live holder census + concentration — who holds NOW (`client.getTokenHolders(mint)`). `concentration.holder_count` is EXACT (mint-scoped `getProgramAccounts` census; `null` only when the provider refuses a mega-cap → top-20 fallback with `source.census_fallback_reason`, never trade-estimated). Owners labelled `deployer` / `kol` / `early_buyer` / `bundle` / `bot` / `dump_cluster` (empty = unknown, not clean); pools / bonding curves / burns EXCLUDED from circulating and NAMED in `excluded[]` (`pool` + `dex` + `pool_address`, `bonding_curve`, `burn`, `program_account`); `amount_raw` is a raw u64 STRING. Disclosure PRO 10 / ULTRA 50 / BUSINESS 100. Big tokens: first call may be HTTP 503 `holder_scan_in_progress` (retry in 20 s — scan continues + cached) (PRO+) |
@@ -387,3 +399,29 @@ Free tier returns the full REST response shape on 40+ endpoints — real wallets
 ## License
 
 MIT
+
+---
+
+## Agent Intelligence Gateway compatibility (coordinated release)
+
+**Scope:** ElizaOS Solana plugin — Solana.
+
+MadeOnSol's [Agent Intelligence Gateway](https://madeonsol.com/agent-gateway) is
+a separate six-action, read-only research layer: `discover_opportunities`,
+`evaluate_token`, `inspect_wallet`, `inspect_deployer`, `evaluate_signal`,
+and `changes_since`. These actions must not be inferred from a package's
+existing endpoint tools or release number. Follow only an actually published
+package manifest and the [six-tool reference](https://madeonsol.com/agent-gateway/docs).
+
+The existing ElizaOS actions remain the production entry point. The six Agent Gateway research intents are separate from legacy plugin action names until a matching plugin version is published and tested. Keep the user's paid API tier and quota, make read-only actions explicit, and never let an AI agent invoke swaps or account mutations under the name of research.
+
+**Access models:** a paid subscription authenticates a recurring API client;
+individual x402 calls are available only for exact live priced routes and
+accepted payment legs. MCP/Agent Kit/ElizaOS are tool integration layers, not
+independent billing plans. An account's usage limits and commercial
+redistribution entitlements still apply.
+
+The coordinated release is tracked in the [MadeOnSol source repository](https://github.com/MadeOnSol/madeonsol).
+Do not claim six-tool support from an unpublished local manifest or call a
+not-yet-deployed public Agent Gateway route. Client packages must be published
+and their registry versions synchronized before the site advertises support.

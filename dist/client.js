@@ -478,6 +478,61 @@ export class MadeOnSolClient {
         return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/bundle`);
     }
     /**
+     * Every coordinated buy cluster on a token in a window, the launch bundle AND clusters that
+     * enter later (GET /tokens/{mint}/bundles). A cluster is a slot where at least `min_wallets`
+     * distinct wallets bought. Only stored buys count (persistence floor 0.05 SOL / $3.50 stable leg).
+     * `summary.baseline` gives buys per active slot: a cluster is evidence, not a verdict.
+     * `include_balances` adds `held_now` to the 3 most recent clusters. PRO+, API key only.
+     */
+    getTokenBundles(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.window)
+            qs.set("window", params.window);
+        if (params?.min_wallets !== undefined)
+            qs.set("min_wallets", String(params.min_wallets));
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        if (params?.include_balances !== undefined)
+            qs.set("include_balances", String(params.include_balances));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/bundles${query}`);
+    }
+    /**
+     * One figure: `bundled_pct_of_supply_now`, the share of supply held now by every bundle wallet
+     * (launch bundle plus the window's clusters, each wallet once), read from chain balances
+     * (GET /tokens/{mint}/bundle-share). Null with `held_now.incomplete_reason` unless every wallet
+     * was read, never a partial sum. Cached 30 s per token. PRO+, API key only.
+     */
+    getTokenBundleShare(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.window)
+            qs.set("window", params.window);
+        if (params?.min_wallets !== undefined)
+            qs.set("min_wallets", String(params.min_wallets));
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/tokens/${encodeURIComponent(mint)}/bundle-share${query}`);
+    }
+    /**
+     * Every stored KOL trade on one token, newest first, keyset paged with `next_cursor`
+     * (GET /kol/tokens/{mint}/trades). BASIC: 5-minute delay, 20 rows. Trades below the KOL
+     * persistence floor are not stored. `since` is an ISO timestamp, `kol` a KOL wallet. API key only.
+     */
+    getKolTokenTrades(mint, params) {
+        const qs = new URLSearchParams();
+        if (params?.limit !== undefined)
+            qs.set("limit", String(params.limit));
+        if (params?.action)
+            qs.set("action", params.action);
+        if (params?.kol)
+            qs.set("kol", params.kol);
+        if (params?.since)
+            qs.set("since", params.since);
+        if (params?.cursor)
+            qs.set("cursor", params.cursor);
+        const query = qs.toString() ? `?${qs.toString()}` : "";
+        return this.restRequest("GET", `/kol/tokens/${encodeURIComponent(mint)}/trades${query}`);
+    }
+    /**
      * Per-venue liquidity map — every DEX pool a token trades in, live vs parked, with
      * fragmentation and top-pool share. Each pool carries `pool_address`, `dex`,
      * `quote_mint`, `liquidity_usd`, `last_price_sol`, `last_swap_at`, `amm_id`, and
